@@ -1,0 +1,33 @@
+# dependencies (ANYWHERE)
+**/node_modules
+
+# next.js (ANYWHERE)
+**/.next
+**/out
+
+# build outputs
+**/dist
+**/build
+
+# env
+.env*
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# runtime (IMPORTANT - never commit user projects)
+cloud-ide-runtime
+workspace
+
+# misc
+.DS_Store
+*.pem
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
