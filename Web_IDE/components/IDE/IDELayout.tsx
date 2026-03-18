@@ -90,13 +90,37 @@ export default function IDELayout({ project, files: initialFiles }: any) {
             return
         }
 
-        await fetch(`/api/projects/${project.id}/run`, {
-            method: "POST"
+        await fetch("http://localhost:4000/run", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-api-key": "secret" // if you added security
+            },
+            body: JSON.stringify({
+                projectId: project.id,
+                files // IMPORTANT: send files
+            })
         })
 
         iframeRef.current.src =
             `http://${project.id}.preview.localhost:4000?ts=${Date.now()}`
     }
+
+    useEffect(() => {
+
+        const interval = setInterval(() => {
+            fetch("http://localhost:4000/ping", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ projectId: project.id })
+            })
+        }, 10000) // every 10s
+
+        return () => clearInterval(interval)
+
+    }, [project.id])
 
     useEffect(() => {
 

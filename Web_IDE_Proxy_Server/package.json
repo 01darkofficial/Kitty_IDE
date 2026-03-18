@@ -13,6 +13,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.32.1",
   "devDependencies": {
+    "@types/dockerode": "^4.0.1",
     "@types/http-proxy": "^1.17.17",
     "@types/node": "^25.5.0",
     "nodemon": "^3.1.14",
@@ -20,6 +21,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "dockerode": "^4.0.9",
     "http": "0.0.1-security",
     "http-proxy": "^1.18.1"
   }

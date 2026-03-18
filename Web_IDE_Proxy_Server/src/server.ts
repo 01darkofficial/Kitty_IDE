@@ -1,8 +1,10 @@
 import http from "http"
 import httpProxy from "http-proxy"
+import { startProjectContainer } from "./runtime"
 
 const proxy = httpProxy.createProxyServer({})
 const runtimeMap = new Map<string, number>()
+const lastUsedMap = new Map()
 
 proxy.on("error", (err, req, res) => {
     console.error("Proxy error:", err.message)
@@ -17,6 +19,22 @@ proxy.on("error", (err, req, res) => {
 })
 
 const server = http.createServer((req, res) => {
+
+    // ---------------------------
+    // CORS HEADERS (REQUIRED)
+    // ---------------------------
+    res.setHeader("Access-Control-Allow-Origin", "*")
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key")
+
+    // ---------------------------
+    // HANDLE PREFLIGHT
+    // ---------------------------
+    if (req.method === "OPTIONS") {
+        res.writeHead(200)
+        res.end()
+        return
+    }
 
     /* container registration from IDE server */
 
@@ -35,6 +53,50 @@ const server = http.createServer((req, res) => {
             console.log("Proxy registered:", projectId, "→", port)
 
             res.end("ok")
+        })
+
+        return
+    }
+
+    if (req.method === "POST" && req.url === "/ping") {
+
+        let body = ""
+
+        req.on("data", chunk => body += chunk)
+
+        req.on("end", () => {
+
+            const { projectId } = JSON.parse(body)
+
+            lastUsedMap.set(projectId, Date.now())
+
+            res.end("ok")
+        })
+
+        return
+    }
+
+    if (req.method === "POST" && req.url === "/run") {
+
+        let body = ""
+
+        req.on("data", chunk => body += chunk)
+
+        req.on("end", async () => {
+
+            try {
+                const { projectId, files } = JSON.parse(body)
+
+                const port = await startProjectContainer(projectId, files)
+
+                res.setHeader("Content-Type", "application/json")
+                res.end(JSON.stringify({ port }))
+
+            } catch (err) {
+                console.error("Run error:", err)
+                res.statusCode = 500
+                res.end("failed")
+            }
         })
 
         return

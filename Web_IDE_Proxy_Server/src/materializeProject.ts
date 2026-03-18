@@ -1,19 +1,13 @@
 import fs from "fs/promises"
 import path from "path"
-import { supabaseAdmin } from "@/lib/supabase/admin"
+import { FileNode } from "./types/db"
 
-export async function materializeProject(projectId: string) {
+export async function materializeProject(projectId: string, files: FileNode[]) {
 
     const workspace = `/home/wizard/Desktop/cloud-ide-runtime/projects/${projectId}`
+    await fs.rm(workspace, { recursive: true, force: true })
 
     await fs.mkdir(workspace, { recursive: true })
-
-    const { data: files } = await supabaseAdmin
-        .from("files")
-        .select("*")
-        .eq("project_id", projectId)
-
-    if (!files) return workspace
 
     const fileMap = new Map()
 
@@ -21,7 +15,7 @@ export async function materializeProject(projectId: string) {
         fileMap.set(f.id, f)
     }
 
-    async function buildPath(file: any) {
+    function buildPath(file: any) {
 
         const parts = [file.name]
 
@@ -41,12 +35,10 @@ export async function materializeProject(projectId: string) {
 
         if (file.type !== "file") continue
 
-        const relativePath = await buildPath(file)
-
+        const relativePath = buildPath(file)
         const fullPath = path.join(workspace, relativePath)
 
         await fs.mkdir(path.dirname(fullPath), { recursive: true })
-
         await fs.writeFile(fullPath, file.content || "")
     }
 
