@@ -1,6 +1,6 @@
 import { materializeProject } from "./materializeProject"
 import docker from "./docker"
-import { FileNode } from "./types/db"
+import { FileNode } from "../types/db"
 
 export async function startProjectContainer(projectId: string, files: FileNode[]) {
 
@@ -83,7 +83,7 @@ export async function startProjectContainer(projectId: string, files: FileNode[]
     // 3. Register with proxy
     // -------------------------
 
-    await registerWithProxy(projectId, port)
+    // await registerWithProxy(projectId, port)
 
     console.log(`Container ready: ${projectId} → ${port}`)
 
@@ -152,13 +152,34 @@ async function waitForServer(port: number) {
     throw new Error(`Container server did not start on port ${port}`)
 }
 
-async function registerWithProxy(projectId: string, port: number) {
+// async function registerWithProxy(projectId: string, port: number) {
 
-    await fetch("http://localhost:4000/register", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ projectId, port })
-    })
+//     await fetch("http://localhost:4000/register", {
+//         method: "POST",
+//         headers: {
+//             "Content-Type": "application/json"
+//         },
+//         body: JSON.stringify({ projectId, port })
+//     })
+// }
+
+export async function getRunningContainer(projectId: string) {
+    const containerName = `project-${projectId}`
+    const container = docker.getContainer(containerName)
+
+    try {
+        const info = await container.inspect()
+
+        if (!info.State.Running) return null
+
+        const port = Number(
+            info.NetworkSettings.Ports["5173/tcp"][0].HostPort
+        )
+
+        return { container, port }
+
+    } catch (err: any) {
+        if (err.statusCode === 404) return null
+        throw err
+    }
 }

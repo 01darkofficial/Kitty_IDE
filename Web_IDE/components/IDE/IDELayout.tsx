@@ -31,6 +31,7 @@ export default function IDELayout({ project, files: initialFiles }: any) {
 
     const [fileDialogOpen, setFileDialogOpen] = useState(false)
     const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+    const [hasRun, setHasRun] = useState(false)
 
     const iframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -74,8 +75,6 @@ export default function IDELayout({ project, files: initialFiles }: any) {
 
     const runProject = async () => {
 
-        if (!iframeRef.current) return
-
         await Promise.all(files.map(f => saveFile(f)))
 
         const hasPackageJson = files.some(
@@ -83,9 +82,9 @@ export default function IDELayout({ project, files: initialFiles }: any) {
         )
 
         if (!hasPackageJson) {
-
-            iframeRef.current.src =
+            iframeRef.current!.src =
                 `/preview/${project.id}/index.html?ts=${Date.now()}`
+            setHasRun(true)
 
             return
         }
@@ -94,19 +93,28 @@ export default function IDELayout({ project, files: initialFiles }: any) {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "x-api-key": "secret" // if you added security
+                "x-api-key": "secret"
             },
             body: JSON.stringify({
                 projectId: project.id,
-                files // IMPORTANT: send files
+                files
             })
         })
+        setHasRun(true)
 
-        iframeRef.current.src =
-            `http://${project.id}.preview.localhost:4000?ts=${Date.now()}`
     }
 
     useEffect(() => {
+        if (!hasRun || !iframeRef.current) return
+
+        iframeRef.current.src =
+            `/preview/${project.id}/index.html?ts=${Date.now()}`
+
+
+    }, [hasRun])
+
+    useEffect(() => {
+        if (!hasRun) return
 
         const interval = setInterval(() => {
             fetch("http://localhost:4000/ping", {
@@ -218,7 +226,7 @@ export default function IDELayout({ project, files: initialFiles }: any) {
                             onChange={updateFileContent}
                         />
 
-                        <PreviewPanel projectId={project.id} iframeRef={iframeRef} />
+                        <PreviewPanel projectId={project.id} iframeRef={iframeRef} hasRun={hasRun} />
 
                     </div>
 

@@ -1,11 +1,13 @@
 import http from "http"
 import httpProxy from "http-proxy"
-import { startProjectContainer } from "./runtime"
+import app from "./app"
+import { runtimeMap } from "./runtime/runtimeMap"
 
 const proxy = httpProxy.createProxyServer({})
-const runtimeMap = new Map<string, number>()
-const lastUsedMap = new Map()
 
+// -------------------
+// proxy error handling
+// -------------------
 proxy.on("error", (err, req, res) => {
     console.error("Proxy error:", err.message)
 
@@ -18,111 +20,57 @@ proxy.on("error", (err, req, res) => {
     }
 })
 
+// -------------------
+// create server
+// -------------------
 const server = http.createServer((req, res) => {
 
-    // ---------------------------
-    // CORS HEADERS (REQUIRED)
-    // ---------------------------
-    res.setHeader("Access-Control-Allow-Origin", "*")
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key")
-
-    // ---------------------------
-    // HANDLE PREFLIGHT
-    // ---------------------------
-    if (req.method === "OPTIONS") {
-        res.writeHead(200)
-        res.end()
-        return
-    }
-
-    /* container registration from IDE server */
-
-    if (req.method === "POST" && req.url === "/register") {
-
-        let body = ""
-
-        req.on("data", chunk => body += chunk)
-
-        req.on("end", () => {
-
-            const { projectId, port } = JSON.parse(body)
-
-            runtimeMap.set(projectId, port)
-
-            console.log("Proxy registered:", projectId, "→", port)
-
-            res.end("ok")
-        })
-
-        return
-    }
-
-    if (req.method === "POST" && req.url === "/ping") {
-
-        let body = ""
-
-        req.on("data", chunk => body += chunk)
-
-        req.on("end", () => {
-
-            const { projectId } = JSON.parse(body)
-
-            lastUsedMap.set(projectId, Date.now())
-
-            res.end("ok")
-        })
-
-        return
-    }
-
-    if (req.method === "POST" && req.url === "/run") {
-
-        let body = ""
-
-        req.on("data", chunk => body += chunk)
-
-        req.on("end", async () => {
-
-            try {
-                const { projectId, files } = JSON.parse(body)
-
-                const port = await startProjectContainer(projectId, files)
-
-                res.setHeader("Content-Type", "application/json")
-                res.end(JSON.stringify({ port }))
-
-            } catch (err) {
-                console.error("Run error:", err)
-                res.statusCode = 500
-                res.end("failed")
-            }
-        })
-
-        return
-    }
-
-    /* determine projectId from subdomain */
-
     const host = req.headers.host || ""
-    const projectId = host.split(".")[0]
 
-    const port = runtimeMap.get(projectId)
+    // -------------------------
+    // API requests → Express
+    // -------------------------
+    if (
+        host === "localhost:4000" ||
+        host.startsWith("localhost:")
+    ) {
+        return app(req, res)
+    }
 
-    if (!port) {
-        res.writeHead(404)
-        res.end("Container not running")
+    // -------------------------
+    // Preview requests → Proxy
+    // -------------------------
+    if (host.includes(".preview.localhost")) {
+
+        const projectId = host.split(".")[0]
+        const port = runtimeMap.get(projectId)
+
+        console.log("runtimeMap:", runtimeMap)
+
+        console.log("Preview request:", projectId, "→", port)
+
+        if (!port) {
+            res.writeHead(404)
+            res.end("Container not running")
+            return
+        }
+
+        proxy.web(req, res, {
+            target: `http://localhost:${port}`,
+            changeOrigin: true
+        })
+
         return
     }
 
-    proxy.web(req, res, {
-        target: `http://localhost:${port}`,
-        changeOrigin: true
-    })
+    // fallback
+    res.writeHead(404)
+    res.end("Invalid host")
 })
 
-/* websocket support (vite HMR etc) */
-
+// -------------------
+// websocket support
+// -------------------
 server.on("upgrade", (req, socket, head) => {
 
     const host = req.headers.host || ""

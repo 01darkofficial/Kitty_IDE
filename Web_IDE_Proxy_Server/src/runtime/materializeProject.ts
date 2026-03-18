@@ -1,6 +1,6 @@
 import fs from "fs/promises"
 import path from "path"
-import { FileNode } from "./types/db"
+import { FileNode } from "../types/db"
 
 export async function materializeProject(projectId: string, files: FileNode[]) {
 
