@@ -2,6 +2,8 @@ import http from "http"
 import httpProxy from "http-proxy"
 import app from "./app"
 import { runtimeMap } from "./runtime/runtimeMap"
+import { lastUsedMap } from "./runtime/activity"
+import { startCleanupLoop } from "./runtime/cleanup"
 
 const proxy = httpProxy.createProxyServer({})
 
@@ -49,6 +51,8 @@ const server = http.createServer((req, res) => {
 
         console.log("Preview request:", projectId, "→", port)
 
+        lastUsedMap.set(projectId, Date.now())
+
         if (!port) {
             res.writeHead(404)
             res.end("Container not running")
@@ -87,6 +91,8 @@ server.on("upgrade", (req, socket, head) => {
         target: `http://localhost:${port}`
     })
 })
+
+startCleanupLoop()
 
 server.listen(4000, () => {
     console.log("Proxy running on http://localhost:4000")

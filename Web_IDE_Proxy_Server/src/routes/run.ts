@@ -1,6 +1,7 @@
 import { Router } from "express"
 import { startProjectContainer } from "../runtime/runtime"
 import { runtimeMap } from "../runtime/runtimeMap"
+import { lastUsedMap } from "../runtime/activity"
 
 const router = Router()
 
@@ -15,13 +16,10 @@ router.post("/", async (req, res) => {
             return res.status(400).json({ error: "projectId required" })
         }
 
-        // remove stale mapping
-        runtimeMap.delete(projectId)
-
         const port = await startProjectContainer(projectId, files)
 
         runtimeMap.set(projectId, port)
-
+        lastUsedMap.set(projectId, Date.now())
         console.log("CONTAINER STARTED:", projectId, "→", port)
 
         res.json({ port })

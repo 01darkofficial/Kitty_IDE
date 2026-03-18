@@ -1,5 +1,6 @@
 import { Router } from "express"
-import { getRunningContainer, startProjectContainer } from "../runtime/runtime"
+import { getRunningContainer } from "../runtime/runtime"
+import { lastUsedMap } from "../runtime/activity"
 
 const router = Router()
 
@@ -13,6 +14,7 @@ router.post("/", async (req, res) => {
             return res.json({ status: "stopped" })
         }
 
+        lastUsedMap.set(projectId, Date.now())
 
         res.json({
             status: "running",
