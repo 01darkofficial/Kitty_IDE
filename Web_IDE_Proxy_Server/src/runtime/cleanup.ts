@@ -1,7 +1,7 @@
 import docker from "./docker"
 import { lastUsedMap } from "./activity"
 
-const TIMEOUT = 5 * 60 * 1000 // 5 minutes
+const TIMEOUT = 10 * 60 * 1000 // 10 minutes
 
 export function startCleanupLoop() {
 

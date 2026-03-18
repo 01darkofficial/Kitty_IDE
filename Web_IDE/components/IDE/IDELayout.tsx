@@ -116,19 +116,28 @@ export default function IDELayout({ project, files: initialFiles }: any) {
     useEffect(() => {
         if (!hasRun) return
 
-        const interval = setInterval(() => {
+        console.log("starting ping loop")
+
+        const sendPing = () => {
             fetch("http://localhost:4000/ping", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({ projectId: project.id })
+            }).catch(() => {
+                // ignore errors (important)
             })
-        }, 10000) // every 10s
+        }
+
+        // ✅ send immediately
+        sendPing()
+
+        const interval = setInterval(sendPing, 10000)
 
         return () => clearInterval(interval)
 
-    }, [project.id])
+    }, [hasRun, project.id])
 
     useEffect(() => {
 
