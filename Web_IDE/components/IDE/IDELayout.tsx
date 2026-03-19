@@ -11,6 +11,7 @@ import { createNode, saveFile } from "@/lib/api/projects/files"
 import { useFileStore } from "@/store/fileStore"
 import CreateItemDialog from "./Explorer/CreateItemDialog"
 import { FileNode } from "@/types/db"
+import TerminalPanel from "./Terminal/TerminalPanel"
 
 export default function IDELayout({ project, files: initialFiles }: any) {
 
@@ -239,7 +240,7 @@ export default function IDELayout({ project, files: initialFiles }: any) {
 
                     </div>
 
-                    <ConsolePanel />
+                    <TerminalPanel projectId={project.id} />
 
                 </div>
 
