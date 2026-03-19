@@ -20,33 +20,54 @@ export default function TerminalPanel({ projectId }: { projectId: string }) {
 
         term.open(containerRef.current)
 
-        // connect WS
-        const ws = new WebSocket(
-            `ws://localhost:4000/terminal?projectId=${projectId}`
-        )
+        let ws: WebSocket | null = null
 
-        ws.onopen = () => {
-            term.write("Connected to terminal\r\n")
-            ws.send("\n") // 🔥 force shell to respond
+        function connect() {
+
+            ws = new WebSocket(
+                `ws://localhost:4000/terminal?projectId=${projectId}`
+            )
+
+            ws.onopen = () => {
+                term.write("\r\n[connected]\r\n")
+                ws!.send("\n")
+            }
+
+            ws.onmessage = (e) => {
+                term.write(e.data)
+            }
+
+            ws.onclose = () => {
+                term.write("\r\n[disconnected... reconnecting]\r\n")
+
+                setTimeout(() => {
+                    connect() // 🔥 reconnect
+                }, 1000)
+            }
+
+            ws.onerror = () => {
+                ws?.close()
+            }
         }
 
-        // 🔥 IMPORTANT: write raw data
-        ws.onmessage = (e) => {
-            term.write(e.data)
-        }
+        connect()
 
+        // input → backend
         term.onData((data) => {
-            ws.send(data)
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                if (data === "\r") {
+                    ws.send("\n")
+                } else {
+                    ws.send(data)
+                }
+            }
         })
 
-        ws.onclose = () => {
-            term.write("\r\n[disconnected]\r\n")
-        }
-
         return () => {
-            ws.close()
+            ws?.close()
             term.dispose()
         }
+
     }, [projectId])
 
     return (
