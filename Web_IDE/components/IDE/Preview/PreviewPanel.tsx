@@ -10,7 +10,7 @@ interface PreviewPanelProps {
 export default function PreviewPanel({ projectId, iframeRef, hasRun }: PreviewPanelProps) {
 
     return (
-        <div className="w-[40%] border-l border-zinc-800 bg-zinc-950 relative">
+        <div className="w-[40%] border-l border-zinc-800 bg-zinc-900 relative">
 
             {/* iframe ALWAYS exists */}
             <iframe
@@ -22,7 +22,7 @@ export default function PreviewPanel({ projectId, iframeRef, hasRun }: PreviewPa
 
             {/* overlay instead of conditional render */}
             {!hasRun && (
-                <div className="absolute inset-0 flex items-center justify-center text-zinc-500 bg-zinc-950">
+                <div className="absolute inset-0 flex items-center justify-center text-zinc-500 bg-zinc-900">
                     Click "Run" to preview
                 </div>
             )}

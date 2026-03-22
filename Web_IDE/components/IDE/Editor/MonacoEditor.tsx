@@ -16,7 +16,7 @@ export default function MonacoEditor({ file, onChange }: any) {
 
     if (!file) {
         return (
-            <div className="flex-1 flex items-center justify-center text-zinc-500">
+            <div className="flex-1 flex items-center justify-center text-zinc-500 bg-zinc-950">
                 Open a file to start editing
             </div>
         )
