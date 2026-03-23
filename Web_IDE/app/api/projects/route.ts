@@ -1,7 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/supabaseServer"
 import { projectSchema } from "@/lib/validation/project"
-import { seedTemplate } from "@/lib/templates/seedTemplate"
-import { TemplateId, templates } from "@/lib/templates/templates"
+import { seedRuntime } from "@/lib/runtime/seedRuntime"
+import z from "zod"
 
 export async function GET() {
     const supabase = await createServerSupabase()
@@ -11,7 +11,10 @@ export async function GET() {
     } = await supabase.auth.getUser()
 
     if (!user) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 })
+        return Response.json(
+            { error: "Unauthorized" },
+            { status: 401 }
+        )
     }
 
     const { data, error } = await supabase
@@ -38,7 +41,10 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 })
+        return Response.json(
+            { error: "Unauthorized" },
+            { status: 401 }
+        )
     }
 
     const body = await req.json()
@@ -47,22 +53,12 @@ export async function POST(req: Request) {
 
     if (!parsed.success) {
         return Response.json(
-            { error: parsed.error.flatten() },
+            { error: z.treeifyError(parsed.error) },
             { status: 400 }
         )
     }
 
-    const { name, template, language, visibility } = parsed.data;
-
-    const templateId = template as TemplateId
-
-    // ensure template exists
-    if (!templates[template]) {
-        return Response.json(
-            { error: "Invalid template" },
-            { status: 400 }
-        )
-    }
+    const { name, runtime, visibility } = parsed.data
 
     // slug normalization
     const slug = name
@@ -75,8 +71,7 @@ export async function POST(req: Request) {
         .from("projects")
         .insert({
             name: slug,
-            template,
-            language,
+            runtime,
             visibility,
             user_id: user.id,
         })
@@ -97,11 +92,15 @@ export async function POST(req: Request) {
         )
     }
 
-    // seed template files
+    // seed runtime files (only static creates files)
     try {
-        await seedTemplate(supabase, project.id, template)
+        await seedRuntime(
+            supabase,
+            project.id,
+            runtime
+        )
     } catch (e) {
-        console.error("Template seeding failed:", e)
+        console.error("Runtime seeding failed:", e)
     }
 
     return Response.json({ project })

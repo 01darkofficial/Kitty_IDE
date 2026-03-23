@@ -69,7 +69,7 @@ export async function startProjectContainer(projectId: string, files: FileNode[]
                 "5173/tcp": {}
             },
 
-            Cmd: ["bash", "-c", "pnpm install && pnpm dev"]
+            Cmd: ["sleep", "infinity"]
         })
 
         await newContainer.start()

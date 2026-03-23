@@ -1,5 +1,5 @@
 import express from "express"
-import runRoute from "./routes/run"
+import startRuntimeRoute from "./routes/startRuntime"
 import pingRoute from "./routes/ping"
 import filesRoute from "./routes/files"
 import cors from "cors"
@@ -11,7 +11,7 @@ const app = express()
 // -------------------
 app.use(express.json())
 app.use(cors())
-app.use("/run", runRoute)
+app.use("/runtime/start", startRuntimeRoute)
 app.use("/ping", pingRoute)
 app.use("/files", filesRoute)
 

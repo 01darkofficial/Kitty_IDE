@@ -1,23 +1,23 @@
 import { SupabaseClient } from "@supabase/supabase-js"
-import { templates, TemplateId } from "./templates"
+import { runtimeDefaults, Runtime } from "./runtimeDefaults"
 
 type FolderRow = {
     id: string
 }
 
-export async function seedTemplate(
+export async function seedRuntime(
     supabase: SupabaseClient,
     projectId: string,
-    templateId: TemplateId
+    runtime: Runtime
 ) {
-    const template = templates[templateId]
+    const runtimeConfig = runtimeDefaults[runtime]
 
-    if (!template) return
+    if (!runtimeConfig) return
 
     // cache folder paths → folder ids
     const folderCache = new Map<string, string>()
 
-    for (const file of template.files) {
+    for (const file of runtimeConfig.files) {
         const parts = file.path.split("/")
 
         let parentId: string | null = null
@@ -27,25 +27,32 @@ export async function seedTemplate(
             const name = parts[i]
             const isFile = i === parts.length - 1
 
-            currentPath = currentPath ? `${currentPath}/${name}` : name
+            currentPath = currentPath
+                ? `${currentPath}/${name}`
+                : name
 
-            // check if folder already created
+            // folder already exists
             if (!isFile && folderCache.has(currentPath)) {
                 parentId = folderCache.get(currentPath)!
                 continue
             }
 
             if (isFile) {
-                const result = await supabase.from("files").insert({
-                    project_id: projectId,
-                    parent_id: parentId,
-                    name,
-                    type: "file",
-                    content: file.content
-                })
+                const result = await supabase
+                    .from("files")
+                    .insert({
+                        project_id: projectId,
+                        parent_id: parentId,
+                        name,
+                        type: "file",
+                        content: file.content
+                    })
 
                 if (result.error) {
-                    throw new Error("Template file creation failed: " + result.error.message)
+                    throw new Error(
+                        "Runtime file creation failed: " +
+                        result.error.message
+                    )
                 }
 
             } else {
@@ -59,13 +66,16 @@ export async function seedTemplate(
                         content: null
                     })
                     .select("id")
-                    .single();
+                    .single()
 
                 const data = result.data as FolderRow | null
                 const error = result.error
 
                 if (error || !data) {
-                    throw new Error("Failed to create template folder: " + error?.message)
+                    throw new Error(
+                        "Failed to create runtime folder: " +
+                        error?.message
+                    )
                 }
 
                 const folderId = data.id

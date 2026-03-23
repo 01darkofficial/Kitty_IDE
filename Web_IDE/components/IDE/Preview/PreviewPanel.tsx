@@ -1,18 +1,35 @@
 "use client"
-import { RefObject } from "react"
+
+import { RefObject, useEffect } from "react"
 
 interface PreviewPanelProps {
-    projectId: string;
-    iframeRef: RefObject<HTMLIFrameElement | null>;
-    hasRun: boolean;
+    projectId: string
+    iframeRef: RefObject<HTMLIFrameElement | null>
 }
 
-export default function PreviewPanel({ projectId, iframeRef, hasRun }: PreviewPanelProps) {
+export default function PreviewPanel({
+    projectId,
+    iframeRef
+}: PreviewPanelProps) {
+
+    /*
+      Load preview automatically
+      when panel mounts
+    */
+
+    useEffect(() => {
+
+        if (!iframeRef.current) return
+
+        iframeRef.current.src =
+            `/preview/${projectId}/index.html?ts=${Date.now()}`
+
+    }, [projectId])
 
     return (
+
         <div className="w-[40%] border-l border-zinc-800 bg-zinc-900 relative">
 
-            {/* iframe ALWAYS exists */}
             <iframe
                 ref={iframeRef}
                 title="preview"
@@ -20,13 +37,7 @@ export default function PreviewPanel({ projectId, iframeRef, hasRun }: PreviewPa
                 className="w-full h-full"
             />
 
-            {/* overlay instead of conditional render */}
-            {!hasRun && (
-                <div className="absolute inset-0 flex items-center justify-center text-zinc-500 bg-zinc-900">
-                    Click "Run" to preview
-                </div>
-            )}
-
         </div>
+
     )
 }

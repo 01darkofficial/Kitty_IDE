@@ -14,175 +14,189 @@ import TerminalPanel from "./Terminal/TerminalPanel"
 
 export default function IDELayout({ project, files: initialFiles }: any) {
 
-    const files = useFileStore((s) => s.files);
-    const setFiles = useFileStore((s) => s.setFiles);
+    const files = useFileStore((s) => s.files)
+    const setFiles = useFileStore((s) => s.setFiles)
 
     useEffect(() => {
-        setFiles(initialFiles);
+        setFiles(initialFiles)
     }, [initialFiles])
 
+    const [tabs, setTabs] = useState<FileNode[]>([])
 
-    const [tabs, setTabs] = useState<FileNode[]>([]);
-    const activeFile = useFileStore((s) => s.activeFile);
-    const setActiveFile = useFileStore((s) => s.setActiveFile);
+    const activeFile = useFileStore((s) => s.activeFile)
+    const setActiveFile = useFileStore((s) => s.setActiveFile)
 
-    const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
-    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+    const [selectedFolder, setSelectedFolder] =
+        useState<string | null>(null)
 
-    const [fileDialogOpen, setFileDialogOpen] = useState(false)
-    const [folderDialogOpen, setFolderDialogOpen] = useState(false)
-    const [hasRun, setHasRun] = useState(false)
+    const [selectedNodeId, setSelectedNodeId] =
+        useState<string | null>(null)
 
-    const iframeRef = useRef<HTMLIFrameElement>(null)
+    const [fileDialogOpen, setFileDialogOpen] =
+        useState(false)
+
+    const [folderDialogOpen, setFolderDialogOpen] =
+        useState(false)
+
+    const iframeRef =
+        useRef<HTMLIFrameElement>(null)
+
+    /*
+      Create File
+    */
 
     const createFile = async (name: string) => {
 
-        console.log(selectedFolder);
+        const node: FileNode =
+            await createNode(project.id, {
+                id: crypto.randomUUID(),
+                project_id: project.id,
+                parent_id: selectedFolder,
+                name,
+                type: "file",
+                content: "",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
 
-        const node: FileNode = await createNode(project.id, {
-            id: crypto.randomUUID(),
-            project_id: project.id,
-            parent_id: selectedFolder,
-            name: name,
-            type: "file",
-            content: "",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        });
-
-        setFiles([...files, node]);
+        setFiles([...files, node])
     }
+
+    /*
+      Create Folder
+    */
 
     const createFolder = async (name: string) => {
 
-        const node: FileNode = await createNode(project.id, {
-            id: crypto.randomUUID(),
-            project_id: project.id,
-            parent_id: selectedFolder,
-            name: name,
-            type: "folder",
-            content: "",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        });
+        const node: FileNode =
+            await createNode(project.id, {
+                id: crypto.randomUUID(),
+                project_id: project.id,
+                parent_id: selectedFolder,
+                name,
+                type: "folder",
+                content: "",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
 
-        setFiles([...files, node]);
+        setFiles([...files, node])
     }
 
     const loadFiles = () => {
         setFiles(initialFiles)
     }
 
-    const runProject = async () => {
-
-        await Promise.all(files.map(f => saveFile(f)))
-
-        const hasPackageJson = files.some(
-            f => f.type === "file" && f.name === "package.json"
-        )
-
-        if (!hasPackageJson) {
-            iframeRef.current!.src =
-                `/preview/${project.id}/index.html?ts=${Date.now()}`
-            setHasRun(true)
-
-            return
-        }
-
-        await fetch("http://localhost:4000/run", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-api-key": "secret"
-            },
-            body: JSON.stringify({
-                projectId: project.id,
-                files
-            })
-        })
-        setHasRun(true)
-
-    }
-
-    useEffect(() => {
-        if (!hasRun || !iframeRef.current) return
-
-        iframeRef.current.src =
-            `/preview/${project.id}/index.html?ts=${Date.now()}`
-
-
-    }, [hasRun])
-
-    useEffect(() => {
-        if (!hasRun) return
-
-        console.log("starting ping loop")
-
-        const sendPing = () => {
-            fetch("http://localhost:4000/ping", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ projectId: project.id })
-            }).catch(() => {
-                // ignore errors (important)
-            })
-        }
-
-        // ✅ send immediately
-        sendPing()
-
-        const interval = setInterval(sendPing, 10000)
-
-        return () => clearInterval(interval)
-
-    }, [hasRun, project.id])
+    /*
+      Auto-save on Ctrl+S
+      Static runtime → refresh preview
+    */
 
     useEffect(() => {
 
         const handler = (e: KeyboardEvent) => {
 
             if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-                e.preventDefault()
-                console.log("save presses")
-                saveFile(activeFile!)
-            }
 
+                e.preventDefault()
+
+                if (!activeFile) return
+
+                saveFile(activeFile)
+
+                /*
+                  Static → reload preview
+                */
+
+                if (project.runtime === "static") {
+
+                    if (iframeRef.current) {
+
+                        iframeRef.current.src =
+                            `/preview/${project.id}/index.html?ts=${Date.now()}`
+
+                    }
+
+                }
+            }
         }
 
         window.addEventListener("keydown", handler)
 
-        return () => window.removeEventListener("keydown", handler)
+        return () =>
+            window.removeEventListener("keydown", handler)
 
-    }, [activeFile])
+    }, [activeFile, project.runtime, project.id])
+
+    /*
+      Node Runtime Ping Loop
+      Keeps container alive
+    */
+
+    useEffect(() => {
+
+        if (project.runtime !== "node")
+            return
+
+        const sendPing = () => {
+
+            fetch("http://localhost:4000/ping", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    projectId: project.id
+                })
+            }).catch(() => { })
+        }
+
+        sendPing()
+
+        const interval =
+            setInterval(sendPing, 10000)
+
+        return () =>
+            clearInterval(interval)
+
+    }, [project.id, project.runtime])
+
+    /*
+      File Open Logic
+    */
 
     function openFile(file: FileNode) {
 
-        setSelectedNodeId(file.id);
+        setSelectedNodeId(file.id)
 
         if (file.type === "folder") {
-            setSelectedFolder(file.id);
+
+            setSelectedFolder(file.id)
             return
         }
 
-        const exists = tabs.find(t => t.id === file.id);
+        const exists =
+            tabs.find(t => t.id === file.id)
 
         if (!exists) {
-            setTabs([...tabs, file]);
+            setTabs([...tabs, file])
         }
 
-        setActiveFile(file);
+        setActiveFile(file)
     }
 
     function closeTab(fileId: string) {
 
-        const newTabs = tabs.filter(t => t.id !== fileId)
+        const newTabs =
+            tabs.filter(t => t.id !== fileId)
 
         setTabs(newTabs)
 
         if (activeFile?.id === fileId) {
-            setActiveFile(newTabs[newTabs.length - 1] || null)
+
+            setActiveFile(
+                newTabs[newTabs.length - 1] || null
+            )
         }
     }
 
@@ -194,19 +208,37 @@ export default function IDELayout({ project, files: initialFiles }: any) {
 
         if (!activeFile) return
 
-        const updated = files.map((f: any) =>
-            f.id === activeFile.id ? { ...f, content } : f
-        )
+        const updated =
+            files.map((f: any) =>
+                f.id === activeFile.id
+                    ? { ...f, content }
+                    : f
+            )
 
         setFiles(updated)
 
-        setActiveFile({ ...activeFile, content })
+        setActiveFile({
+            ...activeFile,
+            content
+        })
     }
 
+    /*
+      Render
+    */
+
     return (
+
         <div className="h-screen flex flex-col bg-zinc-950 text-zinc-100">
 
-            <IDEHeader project={project} onRun={runProject} />
+            <IDEHeader
+                project={project}
+                previewUrl={
+                    project.runtime === "static"
+                        ? `/preview/${project.id}/index.html`
+                        : undefined
+                }
+            />
 
             <div className="flex flex-1 overflow-hidden">
 
@@ -214,8 +246,12 @@ export default function IDELayout({ project, files: initialFiles }: any) {
                     files={files}
                     onSelect={openFile}
                     selectedNodeId={selectedNodeId!}
-                    onNewFile={() => setFileDialogOpen(true)}
-                    onNewFolder={() => setFolderDialogOpen(true)}
+                    onNewFile={() =>
+                        setFileDialogOpen(true)
+                    }
+                    onNewFolder={() =>
+                        setFolderDialogOpen(true)
+                    }
                     onRefresh={loadFiles}
                 />
 
@@ -235,11 +271,26 @@ export default function IDELayout({ project, files: initialFiles }: any) {
                             onChange={updateFileContent}
                         />
 
-                        <PreviewPanel projectId={project.id} iframeRef={iframeRef} hasRun={hasRun} />
+                        {/* Static → Preview */}
+                        {project.runtime === "static" && (
+
+                            <PreviewPanel
+                                projectId={project.id}
+                                iframeRef={iframeRef}
+                            />
+
+                        )}
 
                     </div>
 
-                    <TerminalPanel projectId={project.id} />
+                    {/* Node → Terminal */}
+                    {project.runtime === "node" && (
+
+                        <TerminalPanel
+                            projectId={project.id}
+                        />
+
+                    )}
 
                 </div>
 

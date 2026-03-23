@@ -1,0 +1,1 @@
+create type project_runtime as enum ('static', 'node');

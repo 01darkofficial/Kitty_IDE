@@ -3,7 +3,6 @@ import { SupabaseClient } from "@supabase/supabase-js"
 
 import { FileNode } from "@/types/db"
 import { supabaseAdmin } from "@/lib/supabase/admin"
-import { resolveRuntime } from "@/lib/runtime/getRuntime"
 
 const MIME_TYPES: Record<string, string> = {
     html: "text/html",
@@ -50,7 +49,9 @@ export async function resolveFile(
             query = query.eq("parent_id", parent)
         }
 
-        const { data } = await query.maybeSingle() as { data: FileNode | null }
+        const { data } = await query.maybeSingle() as {
+            data: FileNode | null
+        }
 
         if (!data) return null
 
@@ -63,7 +64,12 @@ export async function resolveFile(
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: Promise<{ projectId: string; path?: string[] }> }
+    { params }: {
+        params: Promise<{
+            projectId: string
+            path?: string[]
+        }>
+    }
 ) {
 
     const supabase = supabaseAdmin
@@ -84,27 +90,30 @@ export async function GET(
 
     /*
       STEP 1
-      Detect runtime
+      Detect runtime directly
     */
 
     const { data: project } = await supabase
         .from("projects")
-        .select("template")
+        .select("runtime")
         .eq("id", projectId)
         .single()
 
     if (!project) {
-        return new Response("Project not found", { status: 404 })
+        return new Response(
+            "Project not found",
+            { status: 404 }
+        )
     }
 
-    const runtime = resolveRuntime(projectId, project.template)
+    const runtime = project.runtime
 
     /*
       STEP 2
-      If container runtime → proxy server handles it
+      Node runtime → proxy to container
     */
 
-    if (runtime === "container") {
+    if (runtime === "node") {
 
         const url =
             `http://${projectId}.preview.localhost:4000${req.nextUrl.search}`
@@ -114,13 +123,20 @@ export async function GET(
 
     /*
       STEP 3
-      Static runtime → serve files from Supabase
+      Static runtime → serve files from DB
     */
 
-    const file = await resolveFile(supabase, projectId, filePath)
+    const file = await resolveFile(
+        supabase,
+        projectId,
+        filePath
+    )
 
     if (!file || file.type !== "file") {
-        return new Response("File not found", { status: 404 })
+        return new Response(
+            "File not found",
+            { status: 404 }
+        )
     }
 
     return new Response(file.content || "", {

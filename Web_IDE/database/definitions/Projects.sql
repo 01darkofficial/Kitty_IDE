@@ -4,9 +4,8 @@ create table projects (
   user_id uuid not null references auth.users(id) on delete cascade,
 
   name text not null,
-  
-  template text not null default 'vanilla',
-  language text not null default 'javascript',
+
+  runtime project_runtimenot null default 'static',
   visibility text not null default 'private',
 
   created_at timestamp with time zone not null default now(),

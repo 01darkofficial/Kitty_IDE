@@ -55,8 +55,7 @@ export default function CreateProjectDialog({
     } = useForm<ProjectForm>({
         resolver: zodResolver(projectSchema as any),
         defaultValues: {
-            template: "browser_vanilla",
-            language: "javascript",
+            runtime: "static",
             visibility: "private",
         },
     })
@@ -130,14 +129,14 @@ export default function CreateProjectDialog({
                         )}
                     </div>
 
-                    {/* Template */}
+                    {/* Runtime */}
                     <div className="space-y-2">
-                        <Label>Template</Label>
+                        <Label>Runtime</Label>
 
                         <Select
-                            defaultValue="browser_vanilla"
+                            defaultValue="static"
                             onValueChange={(v) =>
-                                setValue("template", v as ProjectForm["template"])
+                                setValue("runtime", v as ProjectForm["runtime"])
                             }
                         >
                             <SelectTrigger>
@@ -145,20 +144,10 @@ export default function CreateProjectDialog({
                             </SelectTrigger>
 
                             <SelectContent>
-                                <SelectItem value="empty">Empty</SelectItem>
-                                <SelectItem value="browser_vanilla">Browser (Vanilla JS)</SelectItem>
-                                <SelectItem value="browser_canvas">Canvas Starter</SelectItem>
-                                <SelectItem value="node_basic">Node Script</SelectItem>
-                                <SelectItem value="node_express">Express API</SelectItem>
-                                <SelectItem value="vite_vanilla">Vite Vanilla</SelectItem>
+                                <SelectItem value="static">Static</SelectItem>
+                                <SelectItem value="node">Node</SelectItem>
                             </SelectContent>
                         </Select>
-
-                        {errors.template && (
-                            <p className="text-xs text-red-500">
-                                {errors.template.message}
-                            </p>
-                        )}
                     </div>
 
                     {/* Advanced */}
@@ -177,32 +166,6 @@ export default function CreateProjectDialog({
 
                         {showAdvanced && (
                             <div className="mt-4 space-y-4 border-t pt-4">
-
-                                {/* Language */}
-                                <div className="space-y-2">
-                                    <Label>Language</Label>
-
-                                    <Select
-                                        defaultValue="javascript"
-                                        onValueChange={(v) =>
-                                            setValue("language", v as ProjectForm["language"])
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-
-                                        <SelectContent>
-                                            <SelectItem value="javascript">
-                                                JavaScript
-                                            </SelectItem>
-
-                                            <SelectItem value="typescript">
-                                                TypeScript
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
 
                                 {/* Visibility */}
                                 <div className="flex items-center justify-between">

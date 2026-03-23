@@ -7,18 +7,12 @@ export const projectSchema = z.object({
         .max(50)
         .regex(/^[a-zA-Z0-9-\s]+$/),
 
-    template: z.enum([
-        "empty",
-        "browser_vanilla",
-        "browser_canvas",
-        "node_basic",
-        "node_express",
-        "vite_vanilla"
+    runtime: z.enum([
+        "static",
+        "node",
     ]),
 
-    language: z.enum(["javascript", "typescript"]),
-
-    visibility: z.enum(["private", "public"]),
+    visibility: z.enum(["private", "public"]).default("private"),
 })
 
 export type ProjectInput = z.infer<typeof projectSchema>
