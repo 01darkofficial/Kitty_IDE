@@ -45,8 +45,6 @@ export async function startProjectContainer(projectId: string, files: FileNode[]
 
         port = Number(await getContainerPort(containerName))
 
-        await waitForServer(port)
-
     } else {
 
         console.log("Creating new container")
@@ -75,15 +73,7 @@ export async function startProjectContainer(projectId: string, files: FileNode[]
         await newContainer.start()
 
         port = Number(await getContainerPort(newContainer.id))
-
-        await waitForServer(port)
     }
-
-    // -------------------------
-    // 3. Register with proxy
-    // -------------------------
-
-    // await registerWithProxy(projectId, port)
 
     console.log(`Container ready: ${projectId} → ${port}`)
 
@@ -102,66 +92,6 @@ export async function getContainerPort(containerId: string) {
     return port
 }
 
-async function removeExistingContainer(docker: any, name: string) {
-
-    try {
-
-        const container = docker.getContainer(name)
-
-        const info = await container.inspect()
-
-        if (info.State.Running) {
-            await container.stop()
-        }
-
-        await container.remove({ force: true })
-
-        console.log("Removed existing container:", name)
-
-    } catch (err) {
-        // container does not exist
-    }
-}
-
-async function waitForServer(port: number) {
-
-    const url = `http://localhost:${port}`
-
-    for (let i = 0; i < 30; i++) {
-
-        try {
-
-            const res = await fetch(url)
-
-            if (res.ok) return
-
-        } catch (err: any) {
-
-            // expected during startup → ignore
-            if (
-                err.code !== "ECONNREFUSED" &&
-                err.code !== "ECONNRESET"
-            ) {
-                console.warn("Unexpected error while waiting:", err)
-            }
-        }
-
-        await new Promise(r => setTimeout(r, 500))
-    }
-
-    throw new Error(`Container server did not start on port ${port}`)
-}
-
-// async function registerWithProxy(projectId: string, port: number) {
-
-//     await fetch("http://localhost:4000/register", {
-//         method: "POST",
-//         headers: {
-//             "Content-Type": "application/json"
-//         },
-//         body: JSON.stringify({ projectId, port })
-//     })
-// }
 
 export async function getRunningContainer(projectId: string) {
     const containerName = `project-${projectId}`
