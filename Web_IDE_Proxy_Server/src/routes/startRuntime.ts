@@ -50,6 +50,7 @@ router.post("/", async (req, res) => {
             )
 
         runtimeMap.set(projectId, port)
+        console.log("runtimeMap:", runtimeMap)
 
         lastUsedMap.set(
             projectId,
@@ -71,6 +72,28 @@ router.post("/", async (req, res) => {
 
         res.status(500).send("failed")
     }
+})
+
+router.get("/status", (req, res) => {
+
+    const { projectId } = req.query
+
+    if (!projectId) {
+        return res.status(400).send("projectId required")
+    }
+
+    if (runtimeMap.has(projectId as string)) {
+
+        return res.json({
+            running: true,
+            port: runtimeMap.get(projectId as string)
+        })
+    }
+
+    res.json({
+        running: false
+    })
+
 })
 
 export default router
