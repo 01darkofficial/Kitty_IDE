@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
+import { ClipboardAddon } from "@xterm/addon-clipboard"
 import "@xterm/xterm/css/xterm.css"
 
 import { Terminal as TerminalIcon } from "lucide-react"
@@ -11,7 +12,6 @@ import {
     Tabs,
     TabsList,
     TabsTrigger,
-    TabsContent
 } from "@/components/shadcn/ui/tabs"
 
 import { Button } from "@/components/shadcn/ui/button"
@@ -38,17 +38,57 @@ export default function TerminalPanel({
         const term = new Terminal({
             cursorBlink: true,
             fontSize: 14,
-            scrollback: 2000,
+            scrollback: 5000,
+            allowProposedApi: true,
+            convertEol: true,
             theme: {
                 background: "#09090b" // zinc-900
-            }
+            },
         })
 
         const fitAddon = new FitAddon()
+        const clipboardAddon = new ClipboardAddon()
 
         term.loadAddon(fitAddon)
+        term.loadAddon(clipboardAddon)
 
         term.open(containerRef.current)
+        setTimeout(() => {
+            containerRef.current?.focus()
+        }, 0)
+
+        term.attachCustomKeyEventHandler((event) => {
+
+            /*
+              COPY
+            */
+
+            if (
+                event.ctrlKey &&
+                event.code === "KeyC"
+            ) {
+
+                if (term.hasSelection()) {
+
+                    const text =
+                        term.getSelection()
+
+                    navigator.clipboard.writeText(text)
+
+                    return false
+                }
+
+                /*
+                  No selection → send SIGINT
+                */
+                if (ws)
+                    ws.send("\x03")
+
+                return false
+            }
+
+            return true
+        })
 
         setTimeout(() => {
             fitAddon.fit()
@@ -157,6 +197,7 @@ export default function TerminalPanel({
 
                     <div
                         ref={containerRef}
+                        tabIndex={0}
                         className={`h-full w-full ${activeTab === "terminal"
                             ? "block"
                             : "hidden"
