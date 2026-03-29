@@ -4,10 +4,21 @@ import { FileNode } from "../types/db"
 
 export async function materializeProject(projectId: string, files: FileNode[]) {
 
-    const workspace = `/home/wizard/Desktop/cloud-ide-runtime/projects/${projectId}`
-    await fs.rm(workspace, { recursive: true, force: true })
+    const workspace = `/var/lib/cloud-ide/projects/${projectId}`
 
-    await fs.mkdir(workspace, { recursive: true })
+    if (!workspace.startsWith("/var/lib/cloud-ide/projects/")) {
+        throw new Error("Invalid workspace path")
+    }
+
+    await fs.rm(
+        workspace,
+        { recursive: true, force: true }
+    )
+
+    await fs.mkdir(
+        workspace,
+        { recursive: true }
+    )
 
     const fileMap = new Map()
 

@@ -3,7 +3,7 @@ import { lastUsedMap } from "./activity"
 
 const TIMEOUT = 10 * 60 * 1000 // 10 minutes
 
-export function startCleanupLoop() {
+export function startCleanupLoop(): void {
 
     setInterval(async () => {
 
@@ -21,15 +21,11 @@ export function startCleanupLoop() {
                 const info = await container.inspect()
 
                 if (info.State.Running) {
-
                     console.log("Stopping idle container:", projectId)
-
                     await container.stop()
-
                 }
 
             } catch (err: any) {
-
                 if (err.statusCode !== 404) {
                     console.error("Cleanup error:", err)
                 }

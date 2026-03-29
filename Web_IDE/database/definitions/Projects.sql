@@ -6,6 +6,7 @@ create table projects (
   name text not null,
 
   runtime project_runtimenot null default 'static',
+  runtime_env JSONB,
   visibility text not null default 'private',
 
   created_at timestamp with time zone not null default now(),

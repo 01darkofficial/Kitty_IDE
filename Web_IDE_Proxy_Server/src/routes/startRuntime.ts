@@ -8,14 +8,12 @@ const router = Router()
 router.post("/", async (req, res) => {
     try {
 
-        const { projectId, files } = req.body
+        const { projectId, projectRuntimeEnv, files } = req.body
 
-        console.log("RUNTIME START REQUEST:", projectId)
+        console.log("runtime_env: ", projectRuntimeEnv);
 
         if (!projectId) {
-            return res
-                .status(400)
-                .json({ error: "projectId required" })
+            return res.status(400).json({ error: "projectId required" })
         }
 
         /*
@@ -23,17 +21,7 @@ router.post("/", async (req, res) => {
         */
 
         if (runtimeMap.has(projectId)) {
-
-            const existingPort =
-                runtimeMap.get(projectId)
-
-            console.log(
-                "Runtime already exists:",
-                projectId,
-                "→",
-                existingPort
-            )
-
+            const existingPort = runtimeMap.get(projectId)
             return res.json({
                 port: existingPort
             })
@@ -42,34 +30,17 @@ router.post("/", async (req, res) => {
         /*
           Start container
         */
+        await startProjectContainer(projectId, projectRuntimeEnv, files)
 
-        const port =
-            await startProjectContainer(
-                projectId,
-                files
-            )
+        runtimeMap.set(projectId, { host: "", port: 0 })
+        lastUsedMap.set(projectId, Date.now())
 
-        runtimeMap.set(projectId, port)
-        console.log("runtimeMap:", runtimeMap)
-
-        lastUsedMap.set(
-            projectId,
-            Date.now()
-        )
-
-        console.log(
-            "CONTAINER STARTED:",
-            projectId,
-            "→",
-            port
-        )
-
-        res.json({ port })
+        res.json({
+            status: "started"
+        })
 
     } catch (err) {
-
         console.error("Runtime start error:", err)
-
         res.status(500).send("failed")
     }
 })
@@ -83,7 +54,6 @@ router.get("/status", (req, res) => {
     }
 
     if (runtimeMap.has(projectId as string)) {
-
         return res.json({
             running: true,
             port: runtimeMap.get(projectId as string)

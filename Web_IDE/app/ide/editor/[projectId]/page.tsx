@@ -24,6 +24,8 @@ export default async function EditorPage({
     */
 
     if (project.runtime === "node") {
+        const projectRuntimeEnv = project.runtime_env
+        console.log(project)
 
         try {
 
@@ -36,6 +38,7 @@ export default async function EditorPage({
                     },
                     body: JSON.stringify({
                         projectId,
+                        projectRuntimeEnv,
                         files
                     })
                 }

@@ -1,23 +1,33 @@
 import { materializeProject } from "./materializeProject"
 import docker from "./docker"
-import { FileNode } from "../types/db"
+import { FileNode, RuntimeEnv } from "../types/db"
+import { getRuntimeImage } from "./getRuntimeImage"
+import Dockerode from "dockerode"
 
-export async function startProjectContainer(projectId: string, files: FileNode[]) {
+export interface RunningContainer {
+    container: Dockerode.Container
+    host: string
+    port: number
+}
+
+export async function startProjectContainer(
+    projectId: string,
+    projectRuntimeEnv: RuntimeEnv,
+    files: FileNode[]
+): Promise<void> {
 
     const containerName = `project-${projectId}`
-
     const container = docker.getContainer(containerName)
 
     let exists = false
     let isRunning = false
 
-    // -------------------------
-    // 1. Check container state
-    // -------------------------
     try {
         const info = await container.inspect()
+
         exists = true
         isRunning = info.State.Running
+
     } catch (err: any) {
         if (err.statusCode !== 404) {
             console.error("Docker inspect error:", err)
@@ -25,91 +35,80 @@ export async function startProjectContainer(projectId: string, files: FileNode[]
         }
     }
 
-    let port: number
+    // -------------------------
+    // Fetch project runtime
+    // -------------------------
+
+    const image = getRuntimeImage(projectRuntimeEnv.node)
+
+    console.log("Using runtime image:", image)
 
     // -------------------------
-    // 2. Handle cases
+    // Create container if needed
     // -------------------------
 
     if (exists && isRunning) {
-
         console.log("Reusing running container")
-
-        port = Number(await getContainerPort(containerName))
-
-    } else if (exists && !isRunning) {
-
-        console.log("Starting stopped container")
-
-        await container.start()
-
-        port = Number(await getContainerPort(containerName))
-
-    } else {
-
-        console.log("Creating new container")
-
-        const workspace = await materializeProject(projectId, files)
-
-        const newContainer = await docker.createContainer({
-            Image: "cloud-ide-node",
-            name: containerName,
-            WorkingDir: "/workspace",
-
-            HostConfig: {
-                Binds: [`${workspace}:/workspace`],
-                PortBindings: {
-                    "5173/tcp": [{ HostPort: "" }]
-                }
-            },
-
-            ExposedPorts: {
-                "5173/tcp": {}
-            },
-
-            Cmd: ["sleep", "infinity"]
-        })
-
-        await newContainer.start()
-
-        port = Number(await getContainerPort(newContainer.id))
+        return
     }
 
-    console.log(`Container ready: ${projectId} → ${port}`)
+    if (exists && !isRunning) {
+        console.log("Starting stopped container")
+        await container.start()
+        return
+    }
 
-    return port
+    console.log("Creating new container")
+    const workspace = await materializeProject(projectId, files)
+
+    const newContainer = await docker.createContainer({
+        Image: image,
+        name: containerName,
+        WorkingDir: "/workspace",
+        HostConfig: {
+            Binds: [
+                `${workspace}:/workspace`,
+                `/var/cache/cloud-ide/pnpm-store:/pnpm-store`
+            ]
+        },
+        Cmd: ["sleep", "infinity"]
+    })
+
+    await newContainer.start()
+
 }
 
-export async function getContainerPort(containerId: string) {
 
-    const container = docker.getContainer(containerId)
+export async function getRunningContainer(
+    projectId: string
+): Promise<RunningContainer | null> {
 
-    const data = await container.inspect()
-
-    const port =
-        data.NetworkSettings.Ports["5173/tcp"][0].HostPort
-
-    return port
-}
-
-
-export async function getRunningContainer(projectId: string) {
     const containerName = `project-${projectId}`
     const container = docker.getContainer(containerName)
 
     try {
         const info = await container.inspect()
 
-        if (!info.State.Running) return null
+        if (!info.State.Running) {
+            return null
+        }
 
-        const port = Number(
-            info.NetworkSettings.Ports["5173/tcp"][0].HostPort
-        )
+        // Get container IP safely
+        const networks = info.NetworkSettings.Networks
+        const networkName = Object.keys(networks)[0]
+        const containerIP = networks[networkName].IPAddress
 
-        return { container, port }
+        return {
+            container,
+            host: containerIP,
+            port: 0 // will be detected later
+        }
 
     } catch (err: any) {
-        if (err.statusCode === 404) return null
+        if (err.statusCode === 404) {
+            return null
+        }
         throw err
     }
+
 }

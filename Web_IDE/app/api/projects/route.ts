@@ -1,6 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/supabaseServer"
 import { projectSchema } from "@/lib/validation/project"
 import { seedRuntime } from "@/lib/runtime/seedRuntime"
+import { resolveRuntimeEnv } from "@/lib/runtime/resolveRuntimeEnv"
 import z from "zod"
 
 export async function GET() {
@@ -58,7 +59,22 @@ export async function POST(req: Request) {
         )
     }
 
-    const { name, runtime, visibility } = parsed.data
+    const { name, runtime, runtime_env, visibility } = parsed.data
+
+    let resolvedRuntimeEnv = null
+
+    if (runtime === "node") {
+
+        resolvedRuntimeEnv =
+            await resolveRuntimeEnv(
+                runtime_env || {
+                    node: "latest"
+                }
+            )
+
+    }
+
+    console.log(resolvedRuntimeEnv);
 
     // slug normalization
     const slug = name
@@ -72,6 +88,7 @@ export async function POST(req: Request) {
         .insert({
             name: slug,
             runtime,
+            runtime_env: resolvedRuntimeEnv,
             visibility,
             user_id: user.id,
         })

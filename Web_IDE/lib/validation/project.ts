@@ -12,6 +12,13 @@ export const projectSchema = z.object({
         "node",
     ]),
 
+    runtime_env: z.object({
+
+        node: z.string(),
+        pnpm: z.string()
+
+    }).optional(),
+
     visibility: z.enum(["private", "public"]).default("private"),
 })
 

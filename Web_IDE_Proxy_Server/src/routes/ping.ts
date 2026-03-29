@@ -9,7 +9,6 @@ router.post("/", async (req, res) => {
         const { projectId } = req.body
 
         const container = await getRunningContainer(projectId)
-        console.log("PING ROUTE HIT")
         if (!container) {
             return res.json({ status: "stopped" })
         }
