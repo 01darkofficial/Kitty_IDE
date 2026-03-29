@@ -1,0 +1,19 @@
+{
+  "default": "25",
+
+  "versions": [
+
+    {
+      "node": "25",
+      "pnpm": "10",
+      "label": "Node 25 (latest)"
+    },
+
+    {
+      "node": "24",
+      "pnpm": "9",
+      "label": "Node 24 (LTS)"
+    }
+
+  ]
+}
