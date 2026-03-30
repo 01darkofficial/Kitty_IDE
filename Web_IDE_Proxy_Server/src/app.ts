@@ -1,7 +1,7 @@
 import express from "express"
-import startRuntimeRoute from "./routes/startRuntime"
-import pingRoute from "./routes/ping"
-import filesRoute from "./routes/files"
+import startRuntimeRoute from "./routes/runtime.routes"
+import pingRoute from "./routes/activity.routes"
+import filesRoute from "./routes/files.routes"
 import cors from "cors"
 
 const app = express()
