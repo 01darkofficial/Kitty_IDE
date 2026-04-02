@@ -6,12 +6,8 @@ export async function GET(
 ) {
 
     const { projectId } = await params
-
     const supabase = await createServerSupabase()
-
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const { data: { user }, } = await supabase.auth.getUser()
 
     if (!user) {
         return Response.json({ error: "Unauthorized" }, { status: 401 })

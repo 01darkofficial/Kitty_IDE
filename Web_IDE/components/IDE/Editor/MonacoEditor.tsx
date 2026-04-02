@@ -27,7 +27,6 @@ export default function MonacoEditor({ file, onChange }: any) {
     return (
         <div className="flex-1">
             <Editor
-                key={file.id}
                 height="100%"
                 theme="vs-dark"
                 language={language}
