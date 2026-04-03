@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
 import { ClipboardAddon } from "@xterm/addon-clipboard"
+// @ts-ignore: side-effect import for xterm css without type declarations
 import "@xterm/xterm/css/xterm.css"
 
 import { Terminal as TerminalIcon } from "lucide-react"
@@ -15,6 +16,8 @@ import {
 } from "@/components/shadcn/ui/tabs"
 
 import { Button } from "@/components/shadcn/ui/button"
+import { fetchProjectTree } from "@/lib/api/projects/files"
+import { useFileStore } from "@/store/fileStore"
 
 export default function TerminalPanel({
     projectId
@@ -28,9 +31,22 @@ export default function TerminalPanel({
 
     const [activeTerminal, setActiveTerminal] = useState("terminal-1")
 
+    const setFiles = useFileStore(s => s.setFiles)
+
     const terminals = [
         "terminal-1"
     ]
+
+    async function refreshExplorer() {
+
+        const tree =
+            await fetchProjectTree(
+                projectId
+            )
+
+        setFiles(tree)
+
+    }
 
     useEffect(() => {
         if (!containerRef.current) return
@@ -94,6 +110,27 @@ export default function TerminalPanel({
             fitAddon.fit()
         }, 0)
 
+        function sendResize() {
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+
+                ws.send(
+                    JSON.stringify({
+                        type: "resize",
+                        cols: term.cols,
+                        rows: term.rows
+                    })
+                )
+
+            }
+
+        }
+
+        setTimeout(() => {
+            fitAddon.fit()
+            sendResize()
+        }, 0)
+
         termRef.current = term
 
         let ws: WebSocket | null = null
@@ -103,13 +140,74 @@ export default function TerminalPanel({
                 `ws://localhost:4000/terminal?projectId=${projectId}`
             )
 
+            ws.binaryType = "arraybuffer"
+
             ws.onopen = () => {
+
                 term.write("\r\n[connected]\r\n")
+
+                // CRITICAL: fit first
+                fitAddon.fit()
+
+                // Then send resize
+                ws!.send(JSON.stringify({
+                    type: "resize",
+                    cols: term.cols,
+                    rows: term.rows
+                }))
+
                 ws!.send("\n")
             }
 
-            ws.onmessage = e => {
-                term.write(e.data)
+            ws.onmessage = async (e) => {
+
+                /*
+                Try parsing as JSON control message
+                */
+
+                if (typeof e.data === "string") {
+
+                    try {
+
+                        const msg =
+                            JSON.parse(e.data)
+
+                        if (
+                            msg.type ===
+                            "workspace_synced"
+                        ) {
+
+                            console.log(
+                                "Workspace synced — refreshing explorer"
+                            )
+
+                            await refreshExplorer()
+
+                            return
+                        }
+
+                    } catch {
+
+                        /*
+                        Not JSON → terminal text
+                        */
+
+                        term.write(e.data)
+
+                        return
+                    }
+
+                }
+
+                /*
+                Binary terminal data
+                */
+
+                const data =
+                    new Uint8Array(e.data)
+
+                term.write(data)
+
             }
 
             ws.onclose = () => {
@@ -127,14 +225,31 @@ export default function TerminalPanel({
 
         connect()
 
+        window.addEventListener("resize", () => {
+
+            if (!ws) return
+
+            fitAddon.fit()
+
+            ws.send(JSON.stringify({
+                type: "resize",
+                cols: term.cols,
+                rows: term.rows
+            }))
+
+        })
+
         term.onData(data => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                if (data === "\r") {
-                    ws.send("\n")
-                } else {
-                    ws.send(data)
-                }
+
+            if (
+                ws &&
+                ws.readyState === WebSocket.OPEN
+            ) {
+
+                ws.send(data)
+
             }
+
         })
 
         return () => {

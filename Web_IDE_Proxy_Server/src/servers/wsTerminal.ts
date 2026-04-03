@@ -4,6 +4,9 @@ import { detectDevPort } from "../runtime/detectDevPort"
 import { previewPrintedMap, previewReadyMap, runtimeMap } from "../runtime/runtimeMap"
 import { proxy } from "./previewProxy"
 import { lastUsedMap } from "../runtime/activity"
+import { hasWatcher, registerWatcher } from "../runtime/watcherRegistry"
+import { startFileWatcher } from "../runtime/fileWatcher"
+import { initialWorkspaceScan, shouldRunInitialScan } from "../runtime/initialWorkspaceScan"
 
 export const wss = new WebSocketServer({
     noServer: true
@@ -25,10 +28,60 @@ export function setupTerminalWS(): void {
                 return
             }
 
-            const container = await ensureContainerRunning(projectId)
+            console.log("hasWatcher:", projectId, hasWatcher(projectId))
 
+            const container =
+                await ensureContainerRunning(projectId)
+
+            /*
+            Start watcher if needed
+            */
+
+            if (!hasWatcher(projectId)) {
+
+                console.log(
+                    "Starting watcher for:",
+                    projectId
+                )
+
+                const watcher =
+                    startFileWatcher(projectId)
+
+                registerWatcher(
+                    projectId,
+                    watcher
+                )
+
+            }
+
+            /*
+            Check if DB is empty
+            */
+
+            const needsScan =
+                await shouldRunInitialScan(
+                    projectId
+                )
+
+            if (needsScan) {
+
+                console.log(
+                    "Running initial workspace scan"
+                )
+
+                await initialWorkspaceScan(
+                    projectId
+                )
+
+                socket.send(
+                    JSON.stringify({
+                        type: "workspace_synced"
+                    })
+                )
+
+            }
             const exec = await container.exec({
-                Cmd: ["sh", "-i"],
+                Cmd: ["bash"],
                 AttachStdin: true,
                 AttachStdout: true,
                 AttachStderr: true,
@@ -40,55 +93,78 @@ export function setupTerminalWS(): void {
                 stdin: true
             })
 
-            let devPortBuffer = "";
+            /*
+            CRITICAL:
+            Set a default size immediately.
+            Otherwise terminal starts width=1.
+            */
+
+            await exec.resize({
+                h: 30,
+                w: 120
+            })
+
+            let devPortBuffer = ""
+
             stream.on("data", async (chunk: Buffer) => {
 
-                if (chunk.length <= 8) return
+                // Send RAW binary
+                socket.send(chunk)
 
-                const payload = chunk.subarray(8)
-
-                const text = payload.toString("utf-8")
-
-                if (text.includes("localhost")) {
-                    console.log("Detected output: ", text)
-                }
-
-                // Always send raw output
-                socket.send(text)
-
-                // -------------------------
-                // Buffer for detection
-                // -------------------------
+                // Text parsing for localhost detection
+                const text = chunk.toString("utf-8")
 
                 devPortBuffer += text
 
-                await detectDevPort(projectId, devPortBuffer)
-
-                // -------------------------
-                // Print preview link once
-                // -------------------------
+                await detectDevPort(
+                    projectId,
+                    devPortBuffer
+                )
 
                 if (
                     previewReadyMap.get(projectId) &&
                     !previewPrintedMap.get(projectId)
                 ) {
 
-                    const previewURL = `http://${projectId}.preview.localhost:4000`
+                    const previewURL =
+                        `http://${projectId}.preview.localhost:4000`
 
-                    console.log("Preview link generated:", previewURL
+                    socket.send(
+                        `\nPreview: ${previewURL}\n`
                     )
 
-                    socket.send(`\nPreview: ${previewURL}\n`)
-
-                    previewPrintedMap.set(projectId, true)
+                    previewPrintedMap.set(
+                        projectId,
+                        true
+                    )
 
                     devPortBuffer = ""
                 }
 
             })
+            socket.on("message", async (msg) => {
 
-            socket.on("message", (msg) => {
-                stream.write(msg.toString())
+                try {
+
+                    const parsed =
+                        JSON.parse(msg.toString())
+
+                    if (parsed.type === "resize") {
+
+                        await exec.resize({
+                            h: parsed.rows,
+                            w: parsed.cols
+                        })
+
+                        return
+
+                    }
+
+                } catch {
+                    // Not JSON → normal input
+                }
+
+                stream.write(msg)
                 lastUsedMap.set(projectId, Date.now())
             })
 
