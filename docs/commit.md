@@ -8,3 +8,4 @@
 | chore    | Setup, configuration, scripts       |
 | docs     | Documentation updates               |
 | perf     | Performance improvement             |
+| test     | New Tests                           |
