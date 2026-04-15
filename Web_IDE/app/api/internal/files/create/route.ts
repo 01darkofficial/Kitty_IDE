@@ -1,5 +1,6 @@
 import { supabaseAdmin }
     from "@/lib/supabase/admin"
+import { FileNode } from "@/types/db"
 
 export async function POST(
     req: Request
@@ -14,6 +15,11 @@ export async function POST(
             projectId,
             entries
         } = body
+
+        const createdNodes: FileNode[] = []
+
+
+        console.log("frontend recieved entries: ", entries)
 
         if (!projectId) {
 
@@ -40,6 +46,19 @@ export async function POST(
 
         const supabase =
             supabaseAdmin
+
+
+        entries.sort((a, b) => {
+
+            const depthA =
+                a.relative.split("/").length
+
+            const depthB =
+                b.relative.split("/").length
+
+            return depthA - depthB
+
+        })
 
         /*
         Process entries
@@ -180,12 +199,12 @@ export async function POST(
                     created.id
 
             }
-
             /*
             Create final node
             */
 
             const {
+                data: created,
                 error: finalError
             } =
                 await supabase
@@ -202,6 +221,10 @@ export async function POST(
                                 "project_id,parent_id,name"
                         }
                     )
+                    .select("*")   // ← IMPORTANT
+                    .single()
+
+            createdNodes.push(created)
 
             if (finalError) {
 
@@ -216,7 +239,8 @@ export async function POST(
         }
 
         return Response.json({
-            success: true
+            success: true,
+            nodes: createdNodes
         })
 
     }

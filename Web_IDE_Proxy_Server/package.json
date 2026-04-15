@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "main": "src/server.ts",
-  "scripts": {
-    "dev": "nodemon --watch src --ext ts --exec tsx src/server.ts",
-    "test": "vitest run",
-    "build": "tsc",
-    "start": "node dist/server.js"
-  },
+"scripts": {
+  "dev": "NODE_ENV=development nodemon --watch src --ext ts --exec tsx src/server.ts",
+  "test": "NODE_ENV=test vitest run",
+  "build": "tsc",
+  "start": "NODE_ENV=production node dist/server.js"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -32,6 +32,7 @@
     "express": "^5.2.1",
     "http": "0.0.1-security",
     "http-proxy": "^1.18.1",
+    "node-pty": "^1.1.0",
     "ws": "^8.19.0"
   }
 }

@@ -1,230 +1,151 @@
 import { WebSocketServer } from "ws"
+import * as pty from "node-pty"
 import { ensureContainerRunning } from "../runtime/ensureContainerRunning"
 import { detectDevPort } from "../runtime/detectDevPort"
-import { previewPrintedMap, previewReadyMap, runtimeMap } from "../runtime/runtimeMap"
-import { proxy } from "./previewProxy"
+import { previewPrintedMap, previewReadyMap } from "../runtime/runtimeMap"
 import { lastUsedMap } from "../runtime/activity"
 import { hasWatcher, registerWatcher } from "../runtime/watcherRegistry"
 import { startFileWatcher } from "../runtime/fileWatcher"
 import { initialWorkspaceScan, shouldRunInitialScan } from "../runtime/initialWorkspaceScan"
+import { terminalLogger } from "../utils/logger"
 
-export const wss = new WebSocketServer({
+// Terminal WebSocket server instance.
+// Uses noServer because upgrade routing is handled externally.
+export const terminalWss = new WebSocketServer({
     noServer: true
 })
 
+/**
+ * Registers terminal WebSocket connection handling.
+ */
 export function setupTerminalWS(): void {
 
-    wss.on("connection", async (socket, req) => {
+    terminalWss.on("connection", async (socket, req) => {
 
-        console.log("WS connected")
+        terminalLogger.kittyLog("Terminal WS connected")
 
         try {
 
+            // req.url is relative — base URL required
             const url = new URL(req.url!, "http://localhost")
+
             const projectId = url.searchParams.get("projectId")
 
             if (!projectId) {
+                terminalLogger.kittyWarn("Terminal connection missing projectId")
                 socket.close()
                 return
             }
 
-            console.log("hasWatcher:", projectId, hasWatcher(projectId))
+            // Ensure project container is available
+            await ensureContainerRunning(projectId)
 
-            const container =
-                await ensureContainerRunning(projectId)
-
-            /*
-            Start watcher if needed
-            */
-
+            // Start watcher if missing
             if (!hasWatcher(projectId)) {
 
-                console.log(
-                    "Starting watcher for:",
-                    projectId
-                )
+                terminalLogger.kittyDebug("Starting watcher: ", projectId)
 
-                const watcher =
-                    startFileWatcher(projectId)
-
-                registerWatcher(
-                    projectId,
-                    watcher
-                )
-
+                const watcher = startFileWatcher(projectId)
+                registerWatcher(projectId, watcher)
             }
 
-            /*
-            Check if DB is empty
-            */
-
-            const needsScan =
-                await shouldRunInitialScan(
-                    projectId
-                )
+            // Initial workspace scan
+            const needsScan = await shouldRunInitialScan(projectId)
 
             if (needsScan) {
-
-                console.log(
-                    "Running initial workspace scan"
-                )
-
-                await initialWorkspaceScan(
-                    projectId
-                )
-
-                socket.send(
-                    JSON.stringify({
-                        type: "workspace_synced"
-                    })
-                )
-
+                terminalLogger.kittyLog("Running initial scan: ", projectId)
+                await initialWorkspaceScan(projectId)
             }
-            const exec = await container.exec({
-                Cmd: ["bash"],
-                AttachStdin: true,
-                AttachStdout: true,
-                AttachStderr: true,
-                Tty: true
-            })
 
-            const stream = await exec.start({
-                hijack: true,
-                stdin: true
-            })
+            // Spawn terminal PTY
+            const containerName = `project-${projectId}`
 
-            /*
-            CRITICAL:
-            Set a default size immediately.
-            Otherwise terminal starts width=1.
-            */
+            const ptyProcess = pty.spawn(
+                "docker",
+                [
+                    "exec",
+                    "-it",
+                    containerName,
+                    "bash",
+                    "--login"
+                ],
+                {
+                    name: "xterm-256color",
+                    cols: 120,
+                    rows: 30,
+                    env: process.env
+                }
+            )
 
-            await exec.resize({
-                h: 30,
-                w: 120
-            })
+            terminalLogger.kittyLog("Terminal PTY started: ", containerName)
 
+            // Buffer used to detect dev server output
             let devPortBuffer = ""
 
-            stream.on("data", async (chunk: Buffer) => {
+            // Terminal output → browser
+            ptyProcess.onData(async (data: string) => {
 
-                // Send RAW binary
-                socket.send(chunk)
-
-                // Text parsing for localhost detection
-                const text = chunk.toString("utf-8")
-
-                devPortBuffer += text
-
-                await detectDevPort(
-                    projectId,
-                    devPortBuffer
-                )
-
-                if (
-                    previewReadyMap.get(projectId) &&
-                    !previewPrintedMap.get(projectId)
-                ) {
-
-                    const previewURL =
-                        `http://${projectId}.preview.localhost:4000`
-
-                    socket.send(
-                        `\nPreview: ${previewURL}\n`
-                    )
-
-                    previewPrintedMap.set(
-                        projectId,
-                        true
-                    )
-
-                    devPortBuffer = ""
-                }
-
-            })
-            socket.on("message", async (msg) => {
+                socket.send(data)
+                devPortBuffer += data
 
                 try {
-
-                    const parsed =
-                        JSON.parse(msg.toString())
-
-                    if (parsed.type === "resize") {
-
-                        await exec.resize({
-                            h: parsed.rows,
-                            w: parsed.cols
-                        })
-
-                        return
-
-                    }
-
-                } catch {
-                    // Not JSON → normal input
+                    await detectDevPort(projectId, devPortBuffer)
                 }
 
-                stream.write(msg)
+                catch (err) {
+                    terminalLogger.kittyError("Dev port detection failed: ", err)
+                }
+
+                // Print preview URL once ready
+                if (previewReadyMap.get(projectId) && !previewPrintedMap.get(projectId)) {
+
+                    const previewURL = `http://${projectId}.preview.localhost:4000`
+                    socket.send(`\nPreview: ${previewURL}\n`)
+
+                    previewPrintedMap.set(projectId, true)
+                    devPortBuffer = ""
+                    terminalLogger.kittyLog("Preview ready: ", previewURL)
+                }
+            })
+
+            // Browser input → terminal
+            socket.on("message", (msg) => {
+                try {
+                    const parsed = JSON.parse(msg.toString())
+
+                    // Handle terminal resize
+                    if (parsed.type === "resize") {
+                        ptyProcess.resize(parsed.cols, parsed.rows)
+                        return
+                    }
+                }
+
+                catch (err) {
+                    // Ignore JSON parse errors.
+                    // Most messages are plain terminal input.
+                }
+
+                ptyProcess.write(msg.toString())
                 lastUsedMap.set(projectId, Date.now())
             })
 
+            // Cleanup on disconnect
             socket.on("close", () => {
                 try {
-                    stream.end()
-                } catch (err) {
-                    console.error("Error ending stream on WS close: ", err)
+                    ptyProcess.kill()
+                    terminalLogger.kittyLog("Terminal closed: ", projectId)
                 }
 
-                console.log("WS disconnected")
+                catch (err) {
+                    terminalLogger.kittyError("Failed to kill PTY: ", err)
+                }
             })
+        }
 
-        } catch (err) {
-            console.error("Terminal error: ", err)
+        catch (err) {
+            terminalLogger.kittyError("Terminal setup failed: ", err)
             socket.close()
         }
-    }
-    )
-}
+    })
 
-export function handleUpgrade(
-    req: any,
-    socket: any,
-    head: any
-): boolean {
-
-    const url = req.url || ""
-    const host = req.headers.host || ""
-
-    if (url.startsWith("/terminal")) {
-
-        wss.handleUpgrade(req, socket, head, (ws) => {
-            wss.emit("connection", ws, req)
-        })
-
-        return true
-    }
-
-    if (host.includes(".preview.localhost")) {
-
-        const projectId = host.split(".")[0]
-        const runtime = runtimeMap.get(projectId)
-
-        if (!runtime || !runtime.host || runtime.port === 0) {
-
-            console.log("WS runtime not ready: ", projectId)
-            socket.destroy()
-            return true
-        }
-
-        lastUsedMap.set(projectId, Date.now())
-
-        proxy.ws(req, socket, head, {
-            target: `http://${runtime.host}:${runtime.port}`,
-            changeOrigin: true
-        })
-
-        return true
-    }
-
-    return false
 }
