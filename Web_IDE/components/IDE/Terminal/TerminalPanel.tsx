@@ -9,7 +9,17 @@ import "@xterm/xterm/css/xterm.css"
 import { Terminal as TerminalIcon } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, } from "@/components/shadcn/ui/tabs"
 import { Button } from "@/components/shadcn/ui/button"
+import { terminalUILogger } from "@/utils/logger"
 
+/**
+ * Terminal UI panel.
+ *
+ * Responsibilities:
+ * - Initialize xterm instance
+ * - Maintain WebSocket session
+ * - Handle resize synchronization
+ * - Forward terminal input/output
+ */
 export default function TerminalPanel({
     projectId
 }: {
@@ -21,8 +31,24 @@ export default function TerminalPanel({
     const [activeTab, setActiveTab] = useState("terminal")
     const [activeTerminal, setActiveTerminal] = useState("terminal-1")
     const terminals = ["terminal-1"]
+    const initializedRef = useRef(false)
+    const isRealUnmountRef = useRef(false)
+
+    // Component mount
+    useEffect(() => {
+        terminalUILogger.kittyDebug("Terminal mounted:", { projectId })
+    }, [])
+
+    // Terminal initialization
 
     useEffect(() => {
+
+        if (initializedRef.current) {
+            return
+        }
+
+        initializedRef.current = true
+        terminalUILogger.kittyLog("Initializing terminal: ", { projectId })
 
         if (!containerRef.current) return
 
@@ -34,10 +60,7 @@ export default function TerminalPanel({
             scrollback: 5000,
             convertEol: true,
             fontFamily: "monospace",
-            theme: {
-                background: "#09090b"
-            },
-
+            theme: { background: "#09090b" }
         })
 
         const fitAddon = new FitAddon()
@@ -47,212 +70,131 @@ export default function TerminalPanel({
         term.loadAddon(clipboardAddon)
 
         let ws: WebSocket | null = null
+        let isUnmounting = false
 
         term.open(containerRef.current)
         term.focus()
         termRef.current = term
 
-        containerRef.current.addEventListener(
-            "mousedown",
-            () => {
-                term.focus()
-            }
-        )
+        containerRef.current.addEventListener("mousedown", () => term.focus())
 
-        /*
-        Track selection state
-        */
-
+        // Selection handling
         let hasSelection = false
 
         term.onSelectionChange(() => {
             hasSelection = term.getSelection().length > 0
         })
 
-
         term.attachCustomKeyEventHandler((event) => {
-            if (
-                event.ctrlKey &&
-                !event.shiftKey &&
-                event.key.toLowerCase() === "c"
-            ) {
+            if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "c") {
 
                 if (hasSelection) {
-
                     const selection = term.getSelection()
-
                     if (selection.length > 0) {
-
-                        navigator.clipboard.writeText(
-                            selection
-                        )
-
+                        navigator.clipboard.writeText(selection)
                         term.clearSelection()
-
                         return false
-                        // Block SIGINT
-
                     }
-
                 }
-
                 return true
-
             }
-
             return true
-
         })
 
-        /*
-        Resize helper
-        */
-
+        // Resize sync
         function sendResize() {
 
-            if (
-                ws &&
-                ws.readyState === WebSocket.OPEN
-            ) {
-
+            if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
-
                     type: "resize",
                     cols: term.cols,
                     rows: term.rows
-
                 }))
-
             }
-
         }
 
         let resizeTimeout: any
 
         function handleResize() {
-
             clearTimeout(resizeTimeout)
 
-            resizeTimeout =
-                setTimeout(() => {
-
-                    fitAddon.fit()
-                    sendResize()
-
-                }, 120)
-
+            resizeTimeout = setTimeout(() => {
+                fitAddon.fit()
+                sendResize()
+            }, 120)
         }
 
-        /*
-        Connect WebSocket
-        */
-
+        // WebSocket connection
         function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                return
+            }
 
-            ws = new WebSocket(
-                `ws://localhost:4000/terminal?projectId=${projectId}`
-            )
-
+            ws = new WebSocket(`ws://localhost:4000/terminal?projectId=${projectId}`)
             ws.binaryType = "arraybuffer"
 
             ws.onopen = () => {
-
-                term.write(
-                    "\r\n[connected]\r\n"
-                )
+                terminalUILogger.kittyLog("Terminal connected: ", { projectId })
+                term.write("\r\n[connected]\r\n")
 
                 setTimeout(() => {
-
                     fitAddon.fit()
                     sendResize()
-
                 }, 300)
-
             }
 
-            ws.onmessage = async (e) => {
-
-                /*
-                CONTROL MESSAGE
-                */
-
+            ws.onmessage = (e) => {
                 if (typeof e.data === "string") {
-                    /*
-                    NORMAL TERMINAL STRING OUTPUT
-                    */
-
                     term.write(e.data)
-
                     return
-
                 }
 
-                /*
-                BINARY TERMINAL OUTPUT
-                */
-
-                const data =
-                    new Uint8Array(e.data)
-
+                const data = new Uint8Array(e.data)
                 term.write(data)
-
             }
 
-            ws.onclose = () => {
 
-                term.write(
-                    "\r\n[disconnected... reconnecting]\r\n"
-                )
+
+            ws.onclose = () => {
+                if (isUnmounting) return
+
+                terminalUILogger.kittyWarn("Terminal disconnected: ", { projectId })
+                term.write("\r\n[disconnected... reconnecting]\r\n")
 
                 setTimeout(connect, 1000)
-
             }
 
             ws.onerror = () => {
-
+                terminalUILogger.kittyError("Terminal socket error: ", { projectId })
                 ws?.close()
-
             }
-
         }
 
         connect()
 
-        window.addEventListener(
-            "resize",
-            handleResize
-        )
+        window.addEventListener("resize", handleResize)
 
-        /*
-        Terminal input → backend
-        */
-
+        // Terminal input
         term.onData(data => {
-
-            if (
-                ws &&
-                ws.readyState === WebSocket.OPEN
-            ) {
-
+            if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(data)
-
             }
-
         })
 
+        // Cleanup
         return () => {
+            if (!isRealUnmountRef.current) {
+                isRealUnmountRef.current = true
+                return
+            }
 
-            window.removeEventListener(
-                "resize",
-                handleResize
-            )
+            isUnmounting = true
+            terminalUILogger.kittyDebug("Terminal cleanup: ", { projectId })
+            window.removeEventListener("resize", handleResize)
 
             ws?.close()
-
             term.dispose()
-
         }
-
     }, [projectId])
 
     return (
