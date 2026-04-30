@@ -3,23 +3,30 @@ import { runtimeMap } from "../runtime/runtimeMap"
 import { lastUsedMap } from "../runtime/activity"
 import fs from "fs"
 import path from "path"
+import { previewProxyLogger } from "../utils/logger"
 
-const errorTemplate = fs.readFileSync(
-    path.join(
-        __dirname,
-        "../templates/previewError.html"
-    ),
-    "utf-8"
-)
+/**
+ * Preview proxy.
+ *
+ * Routes:
+ *   <projectId>.preview.localhost
+ * → project runtime container.
+ */
 
+const errorTemplate = fs.readFileSync(path.join(__dirname, "../templates/previewError.html"), "utf-8")
+
+/**
+ * Shared HTTP/WebSocket proxy instance.
+ */
 export const proxy = httpProxy.createProxyServer({ ws: true })
+
+/*
+Proxy-level transport failures.
+*/
 
 proxy.on("error", (err, req, res) => {
 
-    console.error(
-        "Proxy error:",
-        err.message
-    )
+    previewProxyLogger.kittyError("Proxy transport error: ", { message: err.message })
 
     if (!res || !("writeHead" in res)) {
         return
@@ -35,43 +42,56 @@ proxy.on("error", (err, req, res) => {
         "Content-Type": "text/html"
     })
 
-    const html = errorTemplate.replace("{{ERROR_MESSAGE}}", err.message)
+    const html = errorTemplate.replace(
+        "{{ERROR_MESSAGE}}",
+        err.message
+    )
+
     r.end(html)
 
 })
 
-export function handlePreviewRequest(
+/**
+ * Handles preview HTTP requests.
+ *
+ * Returns:
+ *   true  → request handled
+ *   false → not a preview route
+ */
+export async function handlePreviewRequest(
     req: any,
     res: any
-): boolean {
+): Promise<boolean> {
 
     const host = req.headers.host || ""
 
-    console.log("Preview host:", host)
+    const hostname = host.split(":")[0]
 
-    if (!host.includes(".preview.localhost")) {
+    // Validate preview domain
+
+    if (!hostname.endsWith(".preview.localhost")) {
         return false
     }
 
-    const projectId = host.split(".")[0]
 
-    console.log("Preview projectId:", projectId)
+    const projectId = hostname.replace(".preview.localhost", "")
 
-    const runtime = runtimeMap.get(projectId)
+    previewProxyLogger.kittyDebug("Preview request: ", { projectId })
 
-    if (!runtime || runtime.port === 0) {
+    const runtime = await waitForRuntime(projectId)
+
+    if (!runtime) {
+
+        previewProxyLogger.kittyWarn("Runtime unavailable: ", { projectId })
 
         res.writeHead(503, {
             "Content-Type": "text/html"
         })
 
         res.end(`
-        <h2>Preview not ready</h2>
-        <p>
-        Start the development server
-        inside the terminal.
-        </p>
-    `)
+            <h2>Preview not ready</h2>
+            <p>Dev server did not start.</p>
+        `)
 
         return true
     }
@@ -80,7 +100,7 @@ export function handlePreviewRequest(
 
     const target = `http://${runtime.host}:${runtime.port}`
 
-    console.log("Proxy target: ", target)
+    previewProxyLogger.kittyDebug("Proxy target resolved: ", { projectId, port: runtime.port })
 
     proxy.web(req, res, {
         target,
@@ -88,4 +108,41 @@ export function handlePreviewRequest(
     })
 
     return true
+}
+
+/**
+ * Waits until runtime port becomes available.
+ *
+ * Polls runtimeMap until:
+ * - port detected
+ * - timeout reached
+ */
+async function waitForRuntime(
+    projectId: string
+) {
+
+    const timeout = 10000
+    const interval = 100
+
+    const start = Date.now()
+
+    previewProxyLogger.kittyDebug("Waiting for runtime: ", { projectId })
+
+    while (Date.now() - start < timeout) {
+
+        const runtime = runtimeMap.get(projectId)
+
+        if (runtime && runtime.port && runtime.port !== 0) {
+            previewProxyLogger.kittyDebug("Runtime ready: ", { projectId, port: runtime.port })
+            return runtime
+        }
+
+        await new Promise(
+            r => setTimeout(r, interval)
+        )
+    }
+
+    previewProxyLogger.kittyWarn("Runtime wait timeout: ", { projectId })
+
+    return null
 }

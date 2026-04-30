@@ -3,13 +3,25 @@ import docker from "./docker"
 import { FileNode, RuntimeEnv } from "../types/db"
 import { getRuntimeImage } from "./getRuntimeImage"
 import Dockerode from "dockerode"
+import { containerRuntimeLogger } from "../utils/logger"
 
+/**
+ * Runtime container metadata.
+ */
 export interface RunningContainer {
     container: Dockerode.Container
     host: string
     port: number
 }
 
+/**
+ * Ensures project container exists and is running.
+ *
+ * Behavior:
+ * - Reuses running container
+ * - Starts stopped container
+ * - Creates container if missing
+ */
 export async function startProjectContainer(
     projectId: string,
     projectRuntimeEnv: RuntimeEnv,
@@ -22,63 +34,110 @@ export async function startProjectContainer(
     let exists = false
     let isRunning = false
 
+    /*
+    Inspect container state
+    */
+
     try {
         const info = await container.inspect()
 
         exists = true
         isRunning = info.State.Running
 
-    } catch (err: any) {
+        containerRuntimeLogger.kittyDebug("Container inspect: ", { projectId, exists, isRunning })
+    }
+    catch (err: any) {
         if (err.statusCode !== 404) {
-            console.error("Docker inspect error:", err)
+            containerRuntimeLogger.kittyError("Docker inspect failed: ", { projectId, err })
             throw err
         }
     }
 
-    // -------------------------
-    // Fetch project runtime
-    // -------------------------
+    /*
+    Resolve runtime image
+    */
 
     const image = getRuntimeImage(projectRuntimeEnv.node)
+    containerRuntimeLogger.kittyDebug("Runtime image selected: ", { projectId, image })
 
-    console.log("Using runtime image:", image)
-
-    // -------------------------
-    // Create container if needed
-    // -------------------------
+    /*
+    Reuse running container
+    */
 
     if (exists && isRunning) {
-        console.log("Reusing running container")
+        containerRuntimeLogger.kittyLog("Reusing running container: ", { projectId })
         return
     }
 
+    /*
+    Start stopped container
+    */
+
     if (exists && !isRunning) {
-        console.log("Starting stopped container")
+        containerRuntimeLogger.kittyLog("Starting stopped container: ", { projectId })
         await container.start()
         return
     }
 
-    console.log("Creating new container")
+    /*
+    Create new container
+    */
+
+    containerRuntimeLogger.kittyLog("Creating new container: ", { projectId })
+
     const workspace = await materializeProject(projectId, files)
+    let newContainer: Dockerode.Container
 
-    const newContainer = await docker.createContainer({
-        Image: image,
-        name: containerName,
-        WorkingDir: "/workspace",
-        HostConfig: {
-            Binds: [
-                `${workspace}:/workspace`,
-                `/var/cache/cloud-ide/pnpm-store:/pnpm-store`
+    try {
+        newContainer = await docker.createContainer({
+            Image: image,
+            name: containerName,
+            WorkingDir: "/workspace",
+            Env: [
+                "HOST=0.0.0.0",
+                "HOSTNAME=0.0.0.0",
+                "LISTEN_ADDRESS=0.0.0.0",
+                "NODE_ENV=development",
+                "NODE_OPTIONS=--require /var/lib/cloud-ide/runtime/bindAll.js"
+            ],
+
+            HostConfig: {
+                Binds: [
+                    `${workspace}:/workspace`,
+                    `/var/cache/cloud-ide/pnpm-store:/pnpm-store`,
+                    `/var/lib/cloud-ide/runtime/bindAll.js:/var/lib/cloud-ide/runtime/bindAll.js`,
+                    `/var/lib/cloud-ide/runtime/bin/vite:/usr/local/bin/vite`
+                ],
+                NetworkMode: "cloud-ide-net"
+            },
+            Cmd: [
+                "sleep",
+                "infinity"
             ]
-        },
-        Cmd: ["sleep", "infinity"]
-    })
+        })
+    }
+    catch (err) {
+        containerRuntimeLogger.kittyError("Container creation failed: ", { projectId, err })
+        throw err
+    }
 
-    await newContainer.start()
-
+    try {
+        await newContainer.start()
+        containerRuntimeLogger.kittyLog("Container started: ", { projectId })
+    }
+    catch (err) {
+        containerRuntimeLogger.kittyError("Container start failed: ", { projectId, err })
+        throw err
+    }
 }
 
-
+/**
+ * Returns running container metadata.
+ *
+ * Returns null if:
+ * - container missing
+ * - container not running
+ */
 export async function getRunningContainer(
     projectId: string
 ): Promise<RunningContainer | null> {
@@ -90,25 +149,34 @@ export async function getRunningContainer(
         const info = await container.inspect()
 
         if (!info.State.Running) {
+            containerRuntimeLogger.kittyDebug("Container not running: ", { projectId })
             return null
         }
 
-        // Get container IP safely
+        /*
+        Resolve container IP
+        */
+
         const networks = info.NetworkSettings.Networks
         const networkName = Object.keys(networks)[0]
         const containerIP = networks[networkName].IPAddress
 
+        containerRuntimeLogger.kittyDebug("Container running: ", { projectId, ip: containerIP })
+
         return {
             container,
             host: containerIP,
-            port: 0 // will be detected later
+            port: 0 // detected later
         }
-
-    } catch (err: any) {
+    }
+    catch (err: any) {
         if (err.statusCode === 404) {
+            containerRuntimeLogger.kittyDebug("Container not found: ", { projectId })
             return null
         }
+
+        containerRuntimeLogger.kittyError("Container inspect failed: ", { projectId, err })
+
         throw err
     }
-
 }
