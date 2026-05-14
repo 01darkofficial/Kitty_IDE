@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import HomePageSidebar from "@/components/HomePage/Sidebar"
 import AuthHydrator from "@/components/Auth/AuthHydrator"
 import { getProfile, getUser } from "@/lib/api/user/user"
+import { Toaster } from "sonner"
 
 export default async function ProtectedLayout({
     children,
@@ -24,6 +25,7 @@ export default async function ProtectedLayout({
             <HomePageSidebar />
             <main className="flex-1 overflow-auto">
                 {children}
+                <Toaster richColors />
             </main>
         </div>
     )

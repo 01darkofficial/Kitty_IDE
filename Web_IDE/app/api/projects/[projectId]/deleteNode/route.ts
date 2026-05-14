@@ -42,12 +42,11 @@ export async function POST(
         Delete on disk FIRST
         */
 
-        const proxyResponse = await fetch(`${process.env.PROXY_URL}/files/delete`,
+        const runtimeServerResponse = await fetch(`${process.env.RUNTIME_SERVER_URL}/files/delete`,
             {
                 method: "POST",
                 headers: {
-                    "Content-Type":
-                        "application/json"
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
                     projectId,
@@ -57,7 +56,7 @@ export async function POST(
             }
         )
 
-        if (!proxyResponse.ok) {
+        if (!runtimeServerResponse.ok) {
             return Response.json(
                 { error: "Disk delete failed" },
                 { status: 500 }

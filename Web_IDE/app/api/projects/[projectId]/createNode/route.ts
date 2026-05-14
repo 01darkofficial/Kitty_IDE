@@ -73,7 +73,7 @@ export async function POST(
 
     try {
         const t1 = Date.now()
-        const proxyResponse = await fetch(`${process.env.PROXY_URL}/files/create`,
+        const runtimeServerResponse = await fetch(`${process.env.RUNTIME_SERVER_URL}/files/create`,
             {
                 method: "POST",
                 headers: {
@@ -88,10 +88,10 @@ export async function POST(
         )
         console.log("Proxy create:", Date.now() - t1)
 
-        if (!proxyResponse.ok) {
+        if (!runtimeServerResponse.ok) {
             console.error(
                 "Proxy file creation failed:",
-                await proxyResponse.text()
+                await runtimeServerResponse.text()
             )
 
             /*
