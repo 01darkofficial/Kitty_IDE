@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Project } from "@/types/project"
+import { Project } from "@/types/db"
 import ProjectsHeader from "../../../components/Projects/ProjectsHeader"
 import ProjectsList from "../../../components/Projects/ProjectsList"
 import CreateProjectDialog from "../../../components/Projects/CreateProjectDialog"

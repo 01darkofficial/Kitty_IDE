@@ -1,6 +1,6 @@
 
 import ProjectsClient from "@/app/app/projects/ProjectsClient";
-import { Project } from "@/types/project";
+import { Project } from "@/types/db";
 import { getProjects } from "@/lib/api/projects/project";
 import { getUser } from "@/lib/api/user/user";
 
