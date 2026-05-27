@@ -3,6 +3,7 @@ import path from "path"
 import { getDbCount, getValidDiskCount } from "./fileCountValidation"
 import { notifyProject } from "../ws/projectSockets"
 import { workspaceLogger } from "../utils/logger"
+import { IGNORE_NAMES } from "../filesystem/ignoreFileName"
 
 const ROOT = process.env.MAINROOT ?? "/var/lib/cloud-ide/projects"
 const API_URL = process.env.API_URL ?? "http://localhost:3000"
@@ -44,17 +45,17 @@ export async function initialWorkspaceScan(
         for (const entry of entries) {
 
             // Ignore heavy folders
-            if (
-                entry.name === "node_modules" ||
-                entry.name === ".git" ||
-                entry.name === ".pnpm"
-            ) continue
+            if (IGNORE_NAMES.has(entry.name)) continue
 
             const fullPath = path.join(dir, entry.name)
             const relative = path.relative(workspace, fullPath)
             const type = entry.isDirectory() ? "folder" : "file"
 
             entriesToCreate.push({ relative, type })
+
+            if (entry.isSymbolicLink()) {
+                continue
+            }
 
             if (entry.isDirectory()) {
                 await walk(fullPath)

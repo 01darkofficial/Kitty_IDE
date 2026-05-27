@@ -19,3 +19,4 @@ export const previewProxyLogger = createKittyLogger("kitty-runtime-preview-proxy
 export const httpServerLogger = createKittyLogger("kitty-runtime-http");
 export const containerRuntimeLogger = createKittyLogger("kitty-runtime-container");
 export const runtimePortLogger = createKittyLogger("kitty-runtime-port");
+export const projectLogger = createKittyLogger("kitty-runtime-project");

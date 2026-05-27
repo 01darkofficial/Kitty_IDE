@@ -25,8 +25,8 @@ type NavItem = {
 const navItems: NavItem[] = [
     { name: "Home", href: "/app", icon: Home },
     { name: "Projects", href: "/app/projects", icon: Folder },
-    { name: "Templates", href: "/app/templates", icon: LayoutTemplate },
     { name: "Import", href: "/app/import", icon: Upload },
+    { name: "Profile", href: "/app/profile", icon: LayoutTemplate },
     { name: "Settings", href: "/app/settings", icon: Settings },
 ]
 

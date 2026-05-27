@@ -105,20 +105,33 @@ describe(
                     }
                 )
 
-                handlePreviewRequest(
-                    {
-                        headers: {
-                            host:
-                                "abc.preview.localhost"
-                        }
+                const req = {
+                    headers: {
+                        host: "abc.localhost"
                     },
-                    {}
+
+                    url: "/",
+
+                    method: "GET",
+                }
+
+                const res = {
+                    writeHead: vi.fn(),
+                    end: vi.fn(),
+                }
+
+                handlePreviewRequest(
+                    req as any,
+                    res as any
                 )
 
                 expect(
-                    webMock
+                    createProxyServerMock
                 ).toHaveBeenCalled()
 
+                expect(
+                    createProxyServerMock
+                ).toHaveBeenCalled()
             }
         )
 

@@ -1,16 +1,22 @@
 import { Router } from "express"
 
-import { deleteProjectController } from "../controllers/project.controller"
+import { createProjectController, deleteProjectController } from "../controllers/project.controller"
+import multer from "multer"
 
 const router = Router()
 
+const upload = multer({ storage: multer.memoryStorage(), })
+
 /*
-Delete project runtime
+Create project
 */
 
-router.post(
-    "/delete",
-    deleteProjectController
-)
+router.post("/create", upload.array("zip"), createProjectController)
+
+/*
+Delete project
+*/
+
+router.post("/delete", deleteProjectController)
 
 export default router

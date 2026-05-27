@@ -2,14 +2,21 @@ import { createServerSupabase } from "@/lib/supabase/supabaseServer"
 import { projectSchema } from "@/lib/validation/project"
 import { seedRuntime } from "@/lib/runtime/seedRuntime"
 import { resolveRuntimeEnv } from "@/lib/runtime/resolveRuntimeEnv"
+import { projectLogger } from "@/utils/logger"
 import z from "zod"
 
+const RUNTIME_API_URL = process.env.RUNTIME_SERVER_URL
+
+if (!RUNTIME_API_URL) {
+    throw new Error("Missing RUNTIME_API_URL")
+}
+
+/**
+Returns projects owned by the current user.
+*/
 export async function GET() {
     const supabase = await createServerSupabase()
-
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
         return Response.json(
@@ -34,12 +41,16 @@ export async function GET() {
     return Response.json({ projects: data })
 }
 
-export async function POST(req: Request) {
-    const supabase = await createServerSupabase()
+/**
+Creates a new project and provisions
+its runtime workspace.
+*/
+export async function POST(
+    req: Request
+) {
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const supabase = await createServerSupabase()
+    const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
         return Response.json(
@@ -48,9 +59,21 @@ export async function POST(req: Request) {
         )
     }
 
-    const body = await req.json()
+    const formData = await req.formData()
+    const name = formData.get("name")?.toString()
+    const runtime = formData.get("runtime")?.toString()
 
-    const parsed = projectSchema.safeParse(body)
+    const visibility = formData.get("visibility")?.toString()
+    const source = formData.get("source")?.toString()
+
+    const runtime_env = {
+        node: formData.get("nodeVersion")?.toString() || "latest",
+        pnpm: formData.get("pnpmVersion")?.toString() || "latest",
+    }
+
+    const files = formData.getAll("files") as File[]
+
+    const parsed = projectSchema.safeParse({ name, runtime, runtime_env, visibility })
 
     if (!parsed.success) {
         return Response.json(
@@ -59,25 +82,23 @@ export async function POST(req: Request) {
         )
     }
 
-    const { name, runtime, runtime_env, visibility } = parsed.data
+    if (source === "import" && !files.length) {
+
+        return Response.json(
+            { error: "Import requires ZIP file" },
+            { status: 400 }
+        )
+    }
+
+    const { name: validatedName, runtime: validatedRuntime } = parsed.data
 
     let resolvedRuntimeEnv = null
 
-    if (runtime === "node") {
-
-        resolvedRuntimeEnv =
-            await resolveRuntimeEnv(
-                runtime_env || {
-                    node: "latest"
-                }
-            )
-
+    if (validatedRuntime === "node") {
+        resolvedRuntimeEnv = await resolveRuntimeEnv(runtime_env)
     }
 
-    console.log(resolvedRuntimeEnv);
-
-    // slug normalization
-    const slug = name
+    const slug = validatedName
         .trim()
         .toLowerCase()
         .replace(/\s+/g, "-")
@@ -87,10 +108,10 @@ export async function POST(req: Request) {
         .from("projects")
         .insert({
             name: slug,
-            runtime,
+            runtime: validatedRuntime,
             runtime_env: resolvedRuntimeEnv,
             visibility,
-            user_id: user.id,
+            user_id: user.id
         })
         .select()
         .single()
@@ -109,15 +130,76 @@ export async function POST(req: Request) {
         )
     }
 
-    // seed runtime files (only static creates files)
+    projectLogger.kittyLog("Project created: ", {
+        projectId: project.id,
+        source
+    })
+
     try {
-        await seedRuntime(
-            supabase,
-            project.id,
-            runtime
+        if (source === "empty") {
+
+            await seedRuntime(supabase, project.id, validatedRuntime)
+
+            projectLogger.kittyLog("Runtime seeded: ", {
+                projectId: project.id
+            })
+        }
+
+        if (source === "import") {
+
+            const zipFile = files[0]
+
+            projectLogger.kittyLog("Preparing ZIP import: ",
+                {
+                    projectId: project.id,
+                    size: zipFile.size
+                }
+            )
+
+            /*
+            Runtime workspace is materialized
+            through the runtime service.
+            */
+            const runtimeFormData = new FormData()
+
+            runtimeFormData.append("zip", zipFile, "project.zip")
+            runtimeFormData.append("projectId", project.id)
+            runtimeFormData.append("source", "import")
+
+            const materializeRes = await fetch(`${RUNTIME_API_URL}/project/create`, {
+                method: "POST",
+                body: runtimeFormData
+            })
+
+            if (!materializeRes.ok) {
+                const text = await materializeRes.text()
+
+                projectLogger.kittyError("Workspace materialization failed: ", {
+                    projectId: project.id,
+                    status: materializeRes.status,
+                    error: text
+                })
+
+                throw new Error(`Workspace materialization failed: ${text}`)
+            }
+
+            projectLogger.kittyLog("Workspace materialized: ", {
+                projectId: project.id
+            })
+        }
+
+    }
+    catch (err) {
+
+        projectLogger.kittyError("Project setup failed: ", {
+            projectId: project.id,
+            err
+        })
+
+        return Response.json(
+            { error: "Project setup failed" },
+            { status: 500 }
         )
-    } catch (e) {
-        console.error("Runtime seeding failed:", e)
     }
 
     return Response.json({ project })
