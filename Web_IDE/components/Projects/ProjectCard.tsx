@@ -2,24 +2,14 @@
 
 import Link from "next/link"
 import { useState } from "react"
-
 import { Project } from "@/types/db"
-
-import {
-    Card,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-    CardContent,
-} from "@/components/shadcn/ui/card"
-
+import { Card, CardHeader, CardTitle, CardContent, } from "@/components/shadcn/ui/card"
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/shadcn/ui/dropdown-menu"
-
 import {
     AlertDialog,
     AlertDialogAction,
@@ -30,12 +20,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/shadcn/ui/alert-dialog"
-
 import { Button } from "@/components/shadcn/ui/button"
-
 import { MoreVertical, Trash2 } from "lucide-react"
-
 import { toast } from "sonner"
+import { useProjectStore } from "@/store/projectStore"
 
 interface Props {
     project: Project
@@ -45,6 +33,8 @@ export default function ProjectCard({ project }: Props) {
 
     const [confirmOpen, setConfirmOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
+
+    const deleteProject = useProjectStore(s => s.deleteProject)
 
     /*
     Open delete dialog
@@ -70,79 +60,12 @@ export default function ProjectCard({ project }: Props) {
         if (isDeleting) return
 
         try {
-
             setIsDeleting(true)
-
-            console.log(
-                "Deleting project:",
-                project.id
-            )
-
-            const res = await fetch(
-                `/api/projects/${project.id}/deleteProject`,
-                {
-                    method: "DELETE"
-                }
-            )
-
-            let data: any = null
-
-            try {
-                data = await res.json()
-            }
-            catch {
-                // Ignore JSON parsing errors
-            }
-
-            if (!res.ok) {
-
-                console.error(
-                    "Delete failed:",
-                    data
-                )
-
-                toast.error(
-                    data?.error ||
-                    "Failed to delete project"
-                )
-
-                return
-
-            }
-
-            console.log(
-                "Project deleted:",
-                project.id
-            )
-
-            toast.success(
-                "Project deleted successfully"
-            )
-
-            /*
-            TEMP solution
-            Reload page
-
-            Later:
-            Remove project from state
-            */
-
-            setTimeout(() => {
-                window.location.reload()
-            }, 800)
-
+            await deleteProject(project.id)
+            toast.success("Project deleted")
         }
         catch (err) {
-
-            console.error(
-                "Delete request failed:",
-                err
-            )
-
-            toast.error(
-                "Unexpected error during delete"
-            )
-
+            toast.error("Failed to delete project")
         }
         finally {
 
@@ -212,13 +135,6 @@ export default function ProjectCard({ project }: Props) {
                         <CardTitle>
                             {project.name}
                         </CardTitle>
-
-                        <CardDescription>
-
-                            {project.description ||
-                                "No description provided"}
-
-                        </CardDescription>
 
                     </CardHeader>
 

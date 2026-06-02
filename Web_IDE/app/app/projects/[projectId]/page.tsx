@@ -1,6 +1,6 @@
 
 import { FileNode, Project } from "@/types/db"
-import ProjectClient from "./ProjectPageClient"
+import ProjectPageClient from "./ProjectPageClient"
 import { getProject, getProjectFiles } from "@/lib/api/projects/project"
 
 export default async function ProjectPage({
@@ -16,7 +16,7 @@ export default async function ProjectPage({
 
 
     return (
-        <ProjectClient
+        <ProjectPageClient
             project={project}
             files={files ?? []}
         />

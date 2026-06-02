@@ -1,25 +1,41 @@
 import { z } from "zod"
 
-export const projectSchema = z.object({
-    name: z
-        .string()
-        .min(3)
-        .max(50)
-        .regex(/^[a-zA-Z0-9-\s]+$/),
+export const projectSchema = z.discriminatedUnion(
+    "runtime",
+    [
+        z.object({
+            name: z
+                .string()
+                .min(3)
+                .max(50)
+                .regex(/^[a-zA-Z0-9-\s]+$/),
 
-    runtime: z.enum([
-        "static",
-        "node",
-    ]),
+            runtime: z.literal("static"),
 
-    runtime_env: z.object({
+            visibility: z
+                .enum(["private", "public"])
+                .default("private"),
+        }),
 
-        node: z.string(),
-        pnpm: z.string()
+        z.object({
+            name: z
+                .string()
+                .min(3)
+                .max(50)
+                .regex(/^[a-zA-Z0-9-\s]+$/),
 
-    }).optional(),
+            runtime: z.literal("node"),
 
-    visibility: z.enum(["private", "public"]).default("private"),
-})
+            runtime_env: z.object({
+                node: z.string(),
+                pnpm: z.string()
+            }),
+
+            visibility: z
+                .enum(["private", "public"])
+                .default("private"),
+        })
+    ]
+)
 
 export type ProjectInput = z.infer<typeof projectSchema>

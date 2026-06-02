@@ -1,9 +1,20 @@
-import { materializeProject } from "./materializeProject"
 import docker from "./docker"
-import { FileNode, RuntimeEnv } from "../types/db"
+import { RuntimeEnv } from "../types/db"
 import { getRuntimeImage } from "./getRuntimeImage"
 import Dockerode from "dockerode"
 import { containerRuntimeLogger } from "../utils/logger"
+import path from "path"
+import dotenv from "dotenv";
+import { env } from "../config/env"
+
+dotenv.config();
+
+const WORKSPACE_ROOT = env.MAINROOT
+containerRuntimeLogger.kittyLog(WORKSPACE_ROOT)
+
+if (!WORKSPACE_ROOT) {
+    throw new Error("Missing RUNTIME_API_URL")
+}
 
 /**
  * Runtime container metadata.
@@ -24,8 +35,7 @@ export interface RunningContainer {
  */
 export async function startProjectContainer(
     projectId: string,
-    projectRuntimeEnv: RuntimeEnv,
-    files: FileNode[]
+    projectRuntimeEnv: RuntimeEnv
 ): Promise<void> {
 
     const containerName = `project-${projectId}`
@@ -85,7 +95,7 @@ export async function startProjectContainer(
 
     containerRuntimeLogger.kittyLog("Creating new container: ", { projectId })
 
-    const workspace = await materializeProject(projectId, files)
+    const workspace = path.resolve(WORKSPACE_ROOT!, projectId)
     let newContainer: Dockerode.Container
 
     try {

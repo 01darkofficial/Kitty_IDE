@@ -15,7 +15,6 @@ a new imported project workspace.
 export async function uploadProjectZip({
     file,
     filename,
-    projectType,
     nodeVersion,
     pnpmVersion,
 }: UploadProjectZipProps) {
@@ -30,7 +29,7 @@ export async function uploadProjectZip({
     formData.append("pnpmVersion", pnpmVersion)
     formData.append("files", file, filename)
 
-    const response = await fetch("/api/projects/", {
+    const response = await fetch("/api/projects/import", {
         method: "POST",
         body: formData,
     })

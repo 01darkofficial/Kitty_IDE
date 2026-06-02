@@ -17,7 +17,7 @@ interface ProjectClientProps {
   files: FileNode[]
 }
 
-export default function ProjectClient({ project, files }: ProjectClientProps) {
+export default function ProjectPageClient({ project, files }: ProjectClientProps) {
 
   const [activeTab, setActiveTab] = useState("code");
   const router = useRouter();

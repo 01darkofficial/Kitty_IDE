@@ -1,6 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/supabaseServer"
 import { projectSchema } from "@/lib/validation/project"
-import { seedRuntime } from "@/lib/runtime/seedRuntime"
+// import { seedRuntime } from "@/lib/runtime/seedRuntime"
 import { resolveRuntimeEnv } from "@/lib/runtime/resolveRuntimeEnv"
 import { projectLogger } from "@/utils/logger"
 import z from "zod"
@@ -11,10 +11,8 @@ if (!RUNTIME_API_URL) {
     throw new Error("Missing RUNTIME_API_URL")
 }
 
-/**
-Returns projects owned by the current user.
-*/
 export async function GET() {
+
     const supabase = await createServerSupabase()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -29,7 +27,10 @@ export async function GET() {
         .from("projects")
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
+        .order(
+            "created_at",
+            { ascending: false }
+        )
 
     if (error) {
         return Response.json(
@@ -41,14 +42,9 @@ export async function GET() {
     return Response.json({ projects: data })
 }
 
-/**
-Creates a new project and provisions
-its runtime workspace.
-*/
 export async function POST(
     req: Request
 ) {
-
     const supabase = await createServerSupabase()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -59,21 +55,11 @@ export async function POST(
         )
     }
 
-    const formData = await req.formData()
-    const name = formData.get("name")?.toString()
-    const runtime = formData.get("runtime")?.toString()
+    const body = await req.json()
+    const parsed = projectSchema.safeParse(body)
 
-    const visibility = formData.get("visibility")?.toString()
-    const source = formData.get("source")?.toString()
+    console.log(parsed)
 
-    const runtime_env = {
-        node: formData.get("nodeVersion")?.toString() || "latest",
-        pnpm: formData.get("pnpmVersion")?.toString() || "latest",
-    }
-
-    const files = formData.getAll("files") as File[]
-
-    const parsed = projectSchema.safeParse({ name, runtime, runtime_env, visibility })
 
     if (!parsed.success) {
         return Response.json(
@@ -82,20 +68,15 @@ export async function POST(
         )
     }
 
-    if (source === "import" && !files.length) {
-
-        return Response.json(
-            { error: "Import requires ZIP file" },
-            { status: 400 }
-        )
-    }
-
-    const { name: validatedName, runtime: validatedRuntime } = parsed.data
-
+    const {
+        name: validatedName,
+        runtime: validatedRuntime,
+        visibility: validatedVisibility
+    } = parsed.data
     let resolvedRuntimeEnv = null
 
     if (validatedRuntime === "node") {
-        resolvedRuntimeEnv = await resolveRuntimeEnv(runtime_env)
+        resolvedRuntimeEnv = await resolveRuntimeEnv(parsed.data.runtime_env)
     }
 
     const slug = validatedName
@@ -110,7 +91,7 @@ export async function POST(
             name: slug,
             runtime: validatedRuntime,
             runtime_env: resolvedRuntimeEnv,
-            visibility,
+            visibility: validatedVisibility,
             user_id: user.id
         })
         .select()
@@ -130,71 +111,34 @@ export async function POST(
         )
     }
 
-    projectLogger.kittyLog("Project created: ", {
-        projectId: project.id,
-        source
-    })
+    projectLogger.kittyLog("Project created: ", { projectId: project.id })
 
     try {
-        if (source === "empty") {
+        // await seedRuntime(supabase, project.id, validatedRuntime)
+        projectLogger.kittyLog("Workspace provisioning started: ", { projectId: project.id })
 
-            await seedRuntime(supabase, project.id, validatedRuntime)
-
-            projectLogger.kittyLog("Runtime seeded: ", {
+        const runtimeRes = await fetch(`${RUNTIME_API_URL}/project/createWorkspace`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
                 projectId: project.id
             })
+        })
+
+        if (!runtimeRes.ok) {
+            const text = await runtimeRes.text()
+            throw new Error(`Workspace creation failed: ${text}`)
         }
-
-        if (source === "import") {
-
-            const zipFile = files[0]
-
-            projectLogger.kittyLog("Preparing ZIP import: ",
-                {
-                    projectId: project.id,
-                    size: zipFile.size
-                }
-            )
-
-            /*
-            Runtime workspace is materialized
-            through the runtime service.
-            */
-            const runtimeFormData = new FormData()
-
-            runtimeFormData.append("zip", zipFile, "project.zip")
-            runtimeFormData.append("projectId", project.id)
-            runtimeFormData.append("source", "import")
-
-            const materializeRes = await fetch(`${RUNTIME_API_URL}/project/create`, {
-                method: "POST",
-                body: runtimeFormData
-            })
-
-            if (!materializeRes.ok) {
-                const text = await materializeRes.text()
-
-                projectLogger.kittyError("Workspace materialization failed: ", {
-                    projectId: project.id,
-                    status: materializeRes.status,
-                    error: text
-                })
-
-                throw new Error(`Workspace materialization failed: ${text}`)
-            }
-
-            projectLogger.kittyLog("Workspace materialized: ", {
-                projectId: project.id
-            })
-        }
-
     }
     catch (err) {
-
-        projectLogger.kittyError("Project setup failed: ", {
-            projectId: project.id,
-            err
-        })
+        projectLogger.kittyError("Workspace provisioning failed: ",
+            {
+                projectId: project.id,
+                err
+            }
+        )
 
         return Response.json(
             { error: "Project setup failed" },
@@ -203,4 +147,5 @@ export async function POST(
     }
 
     return Response.json({ project })
+
 }

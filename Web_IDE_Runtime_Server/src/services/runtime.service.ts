@@ -18,8 +18,7 @@ import { runtimeLogger } from "../utils/logger"
  */
 export async function startRuntimeService(
     projectId: string,
-    runtimeEnv: any,
-    files: any[]
+    runtimeEnv: any
 ) {
 
     if (!projectId) {
@@ -108,8 +107,7 @@ export async function startRuntimeService(
     runtimeLogger.kittyLog("Creating container: ", { projectId })
 
     try {
-        await startProjectContainer(projectId, runtimeEnv, files)
-
+        await startProjectContainer(projectId, runtimeEnv)
     }
     catch (err) {
         runtimeLogger.kittyError("Creation failed: ", { projectId, err })

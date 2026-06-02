@@ -8,16 +8,26 @@ import { projectLogger } from "../utils/logger"
 import { UploadedFile } from "../types/upload"
 import { IGNORE_NAMES } from "../filesystem/ignoreFileName"
 import { initialWorkspaceScan } from "../runtime/initialWorkspaceScan"
+import { env } from "../config/env";
 
-type CreateProjectServiceProps = {
-    projectId: string
-    source: string
-    files?: UploadedFile[]
-}
-
-const WORKSPACE_ROOT = "/var/lib/cloud-ide/projects"
+const WORKSPACE_ROOT = env.MAINROOT;
 const MAX_FILES = 10000
 const MAX_TOTAL_SIZE = 1024 * 1024 * 500    // 500MB
+
+export async function createWorkspaceService(
+    projectId: string
+) {
+    const workspace = path.resolve(WORKSPACE_ROOT, projectId)
+
+    if (!workspace.startsWith(WORKSPACE_ROOT + path.sep)) {
+        throw new Error("Invalid workspace path")
+    }
+
+    await fs.mkdir(workspace, { recursive: true })
+    projectLogger.kittyLog("Workspace created: ", { projectId })
+
+    return { success: true }
+}
 
 /*
 Creates a project workspace.
@@ -25,11 +35,9 @@ Creates a project workspace.
 ZIP imports include validation against
 path traversal, symlinks, and oversized archives.
 */
-export async function createProjectService({
-    projectId,
-    source,
-    files = []
-}: CreateProjectServiceProps) {
+export async function importWorkspaceService(
+    projectId: string,
+    files: UploadedFile[]) {
 
     const workspace = path.resolve(WORKSPACE_ROOT, projectId)
 
@@ -39,116 +47,110 @@ export async function createProjectService({
 
     await fs.mkdir(workspace, { recursive: true })
 
-    projectLogger.kittyLog("Workspace created: ", { projectId, source })
+    projectLogger.kittyLog("Workspace created: ", { projectId })
+    const zipFile = files?.[0]
 
-    if (source === "empty") {
-        return { success: true }
+    if (!zipFile) {
+        throw new Error("Import ZIP missing")
     }
 
-    if (source === "import") {
-        const zipFile = files?.[0]
+    projectLogger.kittyLog("Extracting import ZIP: ", {
+        projectId,
+        filename: zipFile.originalname,
+    })
 
-        if (!zipFile) {
-            throw new Error("Import ZIP missing")
+    const zip = await JSZip.loadAsync(zipFile.buffer)
+    const entries = Object.entries(zip.files)
+
+    /*
+    Strip common wrapper folders so files
+    extract directly into the workspace.
+    */
+    const normalizedEntries = entries.map(([zipPath]) => zipPath.replace(/\\/g, "/").replace(/\/$/, "")).filter(Boolean)
+    let rootFolder = ""
+    const firstEntry = normalizedEntries[0]
+
+    if (firstEntry) {
+        const candidate = firstEntry.split("/")[0]
+        const allShareSameRoot = normalizedEntries.every((entry) =>
+            entry === candidate || entry.startsWith(candidate + "/")
+        )
+
+        if (allShareSameRoot && normalizedEntries.length > 1) {
+            rootFolder = candidate + "/"
+        }
+    }
+
+    if (entries.length > MAX_FILES) {
+        throw new Error("Too many files in ZIP")
+    }
+
+    let totalSize = 0
+
+    for (const [zipPath, entry] of entries) {
+        let normalized = zipPath.replace(/\\/g, "/").replace(/\/$/, "")
+
+        if (rootFolder && (normalized === rootFolder.slice(0, -1) || normalized.startsWith(rootFolder))) {
+            normalized = normalized.slice(rootFolder.length)
         }
 
-        projectLogger.kittyLog("Extracting import ZIP: ", {
-            projectId,
-            filename: zipFile.originalname,
-        })
+        if (!normalized) {
+            continue
+        }
 
-        const zip = await JSZip.loadAsync(zipFile.buffer)
-        const entries = Object.entries(zip.files)
+        const segments = normalized.split("/")
+        const shouldSkip = segments.some((segment) => IGNORE_NAMES.has(segment))
+
+        if (shouldSkip) {
+            continue
+        }
+
+        const fullPath = path.resolve(workspace, normalized)
 
         /*
-        Strip common wrapper folders so files
-        extract directly into the workspace.
+        Prevent ZIP path traversal attacks.
         */
-        const normalizedEntries = entries.map(([zipPath]) => zipPath.replace(/\\/g, "/").replace(/\/$/, "")).filter(Boolean)
-        let rootFolder = ""
-        const firstEntry = normalizedEntries[0]
-
-        if (firstEntry) {
-            const candidate = firstEntry.split("/")[0]
-            const allShareSameRoot = normalizedEntries.every((entry) =>
-                entry === candidate || entry.startsWith(candidate + "/")
-            )
-
-            if (allShareSameRoot && normalizedEntries.length > 1) {
-                rootFolder = candidate + "/"
-            }
+        if (!fullPath.startsWith(workspace + path.sep)) {
+            throw new Error(`Invalid path:  ${zipPath}`)
         }
 
-        if (entries.length > MAX_FILES) {
-            throw new Error("Too many files in ZIP")
+        if (entry.dir) {
+            await fs.mkdir(fullPath, { recursive: true, })
+            continue
         }
 
-        let totalSize = 0
+        /*
+        Reject symbolic links to avoid writes
+        outside the workspace boundary.
+        */
+        const unixPerm = entry.unixPermissions
+        const isSymlink = isZipSymlink(unixPerm)
 
-        for (const [zipPath, entry] of entries) {
-            let normalized = zipPath.replace(/\\/g, "/").replace(/\/$/, "")
-
-            if (rootFolder && (normalized === rootFolder.slice(0, -1) || normalized.startsWith(rootFolder))) {
-                normalized = normalized.slice(rootFolder.length)
-            }
-
-            if (!normalized) {
-                continue
-            }
-
-            const segments = normalized.split("/")
-            const shouldSkip = segments.some((segment) => IGNORE_NAMES.has(segment))
-
-            if (shouldSkip) {
-                continue
-            }
-
-            const fullPath = path.resolve(workspace, normalized)
-
-            /*
-            Prevent ZIP path traversal attacks.
-            */
-            if (!fullPath.startsWith(workspace + path.sep)) {
-                throw new Error(`Invalid path:  ${zipPath}`)
-            }
-
-            if (entry.dir) {
-                await fs.mkdir(fullPath, { recursive: true, })
-                continue
-            }
-
-            /*
-            Reject symbolic links to avoid writes
-            outside the workspace boundary.
-            */
-            const unixPerm = entry.unixPermissions
-            const isSymlink = isZipSymlink(unixPerm)
-
-            if (isSymlink) {
-                throw new Error(`Symlink not allowed: ${zipPath}`)
-            }
-
-            const content = await entry.async("nodebuffer")
-            totalSize += content.length
-
-            if (totalSize > MAX_TOTAL_SIZE) {
-                throw new Error("ZIP exceeds maximum allowed size")
-            }
-
-            await fs.mkdir(path.dirname(fullPath), { recursive: true, })
-            await fs.writeFile(fullPath, content)
+        if (isSymlink) {
+            throw new Error(`Symlink not allowed: ${zipPath}`)
         }
 
-        projectLogger.kittyLog("ZIP extracted: ", {
-            projectId,
-            totalSize,
-            fileCount: entries.length,
-        })
+        const content = await entry.async("nodebuffer")
+        totalSize += content.length
 
-        await initialWorkspaceScan(projectId)
+        if (totalSize > MAX_TOTAL_SIZE) {
+            throw new Error("ZIP exceeds maximum allowed size")
+        }
+
+        await fs.mkdir(path.dirname(fullPath), { recursive: true, })
+        await fs.writeFile(fullPath, content)
     }
 
-    return { success: true, }
+    projectLogger.kittyLog("ZIP extracted: ", {
+        projectId,
+        totalSize,
+        fileCount: entries.length,
+    })
+
+    await initialWorkspaceScan(projectId)
+
+
+    return { success: true }
 }
 
 /**

@@ -30,8 +30,17 @@ import {
 
 import { Switch } from "@/components/shadcn/ui/switch"
 import { ChevronDown } from "lucide-react"
+import { useProjectStore } from "@/store/projectStore"
 
-type ProjectForm = z.infer<typeof projectSchema>
+type ProjectForm = {
+    name: string
+    runtime: "static" | "node"
+    visibility: "private" | "public"
+    runtime_env: {
+        node: string
+        pnpm: string
+    }
+}
 
 interface Props {
     open: boolean
@@ -47,6 +56,8 @@ export default function CreateProjectDialog({
 
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [loading, setLoading] = useState(false)
+
+    const createProject = useProjectStore(s => s.createProject)
 
     const {
         register,
@@ -69,12 +80,11 @@ export default function CreateProjectDialog({
     const name = watch("name")
     const runtime = watch("runtime")
 
-    const slug =
-        name
-            ?.trim()
-            .toLowerCase()
-            .replace(/\s+/g, "-")
-            .replace(/[^a-z0-9-]/g, "") || ""
+    const slug = name
+        ?.trim()
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "") || ""
 
     /**
      * Reset runtime_env when switching to static
@@ -100,56 +110,39 @@ export default function CreateProjectDialog({
 
             setLoading(true)
 
-            /**
-             * If runtime is static → runtime_env must be null
-             */
-            const payload = {
-                ...values,
-                name: slug,
-                runtime_env:
-                    values.runtime === "node"
-                        ? values.runtime_env
-                        : null
+            const payload =
+                values.runtime === "node"
+                    ? {
+                        name: slug,
+                        runtime: "node" as const,
+                        runtime_env: values.runtime_env,
+                        visibility: values.visibility
+                    }
+                    : {
+                        name: slug,
+                        runtime: "static" as const,
+                        visibility: values.visibility
+                    }
+
+            console.log(payload)
+
+            const project = await createProject(payload)
+
+            if (!project) {
+                return
             }
-
-            const res = await fetch("/api/projects", {
-
-                method: "POST",
-
-                headers: {
-                    "Content-Type": "application/json",
-                },
-
-                body: JSON.stringify(payload),
-
-            })
-
-            if (!res.ok) {
-
-                throw new Error("Project creation failed")
-
-            }
-
-            const data = await res.json()
 
             onOpenChange(false)
-
-            router.push(`/app/projects/${data.project.id}`)
-
+            router.push(`/app/projects/${project.id}`)
         }
 
         catch (err) {
-
             console.error(err)
-
         }
 
         finally {
-
             setLoading(false)
-
         }
-
     }
 
     return (

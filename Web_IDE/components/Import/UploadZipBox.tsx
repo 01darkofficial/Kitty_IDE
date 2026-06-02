@@ -5,6 +5,7 @@ import { cleanZip } from "@/lib/import/cleanZip"
 import { uploadProjectZip } from "@/lib/import/uploadProjectZip"
 import { importLogger } from "@/utils/logger"
 import { useRouter } from "next/navigation"
+import { useProjectStore } from "@/store/projectStore"
 
 type Props = {
     projectType: string
@@ -19,6 +20,9 @@ export default function UploadZipBox({
 }: Props) {
 
     const router = useRouter()
+
+    const addProject = useProjectStore(s => s.addProject)
+
     async function handleFileChange(
         e: React.ChangeEvent<HTMLInputElement>
     ) {
@@ -36,6 +40,8 @@ export default function UploadZipBox({
                 nodeVersion,
                 pnpmVersion,
             })
+
+            addProject(result.project)
 
             router.push(`/app/projects/${result.project.id}`)
 
