@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint"
   },
+  "packageManager": "pnpm@11.8.0",
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@iconify/react": "^6.0.2",

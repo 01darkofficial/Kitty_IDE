@@ -171,8 +171,6 @@ export async function getRunningContainer(
         const networkName = Object.keys(networks)[0]
         const containerIP = networks[networkName].IPAddress
 
-        containerRuntimeLogger.kittyDebug("Container running: ", { projectId, ip: containerIP })
-
         return {
             container,
             host: containerIP,

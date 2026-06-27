@@ -10,6 +10,7 @@ import { Terminal as TerminalIcon } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, } from "@/components/shadcn/ui/tabs"
 import { Button } from "@/components/shadcn/ui/button"
 import { terminalUILogger } from "@/utils/logger"
+import { useTerminalStore } from "@/store/terminalStore"
 
 /**
  * Terminal UI panel.
@@ -29,10 +30,30 @@ export default function TerminalPanel({
     const containerRef = useRef<HTMLDivElement | null>(null)
     const termRef = useRef<Terminal | null>(null)
     const [activeTab, setActiveTab] = useState("terminal")
-    const [activeTerminal, setActiveTerminal] = useState("terminal-1")
-    const terminals = ["terminal-1"]
     const initializedRef = useRef(false)
     const isRealUnmountRef = useRef(false)
+    const addTerminal = useTerminalStore(s => s.addTerminal)
+    const setActiveTerminal = useTerminalStore(s => s.setActiveTerminal)
+    const terminalsMap = useTerminalStore(s => s.terminals)
+    const terminals = Object.values(terminalsMap)
+    const activeTerminalId = useTerminalStore(s => s.activeTerminalId)
+    const addPreview = useTerminalStore(s => s.addPreview)
+    const removePreview = useTerminalStore(s => s.removePreview)
+
+    useEffect(() => {
+        if (terminalsMap["terminal-1"]) {
+            return
+        }
+
+        addTerminal({
+            id: "terminal-1",
+            name: "terminal-1",
+            connected: false,
+            previews: []
+        })
+
+        setActiveTerminal("terminal-1")
+    }, [])
 
     // Component mount
     useEffect(() => {
@@ -42,13 +63,11 @@ export default function TerminalPanel({
     // Terminal initialization
 
     useEffect(() => {
-
         if (initializedRef.current) {
             return
         }
 
         initializedRef.current = true
-        terminalUILogger.kittyLog("Initializing terminal: ", { projectId })
 
         if (!containerRef.current) return
 
@@ -77,8 +96,6 @@ export default function TerminalPanel({
         termRef.current = term
 
         containerRef.current.addEventListener("mousedown", () => term.focus())
-
-        // Selection handling
         let hasSelection = false
 
         term.onSelectionChange(() => {
@@ -87,7 +104,6 @@ export default function TerminalPanel({
 
         term.attachCustomKeyEventHandler((event) => {
             if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "c") {
-
                 if (hasSelection) {
                     const selection = term.getSelection()
                     if (selection.length > 0) {
@@ -103,7 +119,6 @@ export default function TerminalPanel({
 
         // Resize sync
         function sendResize() {
-
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: "resize",
@@ -145,15 +160,42 @@ export default function TerminalPanel({
 
             ws.onmessage = (e) => {
                 if (typeof e.data === "string") {
-                    term.write(e.data)
+                    try {
+                        const message = JSON.parse(e.data)
+
+                        if (message.type === "terminal-history") {
+                            term.write(message.data)
+                            return
+                        }
+
+                        if (message.type === "preview-ready") {
+                            const activeTerminalId = useTerminalStore.getState().activeTerminalId
+                            addPreview(
+                                activeTerminalId!,
+                                {
+                                    id: crypto.randomUUID(),
+                                    port: message.port,
+                                    name: "Preview",
+                                    url: message.url
+                                }
+                            )
+                            return
+                        }
+
+                        if (message.type === "preview-stopped") {
+                            removePreview("terminal-1", message.port)
+                            return
+                        }
+                    }
+                    catch {
+                        term.write(e.data)
+                        return
+                    }
                     return
                 }
-
                 const data = new Uint8Array(e.data)
                 term.write(data)
             }
-
-
 
             ws.onclose = () => {
                 if (isUnmounting) return
@@ -258,26 +300,72 @@ export default function TerminalPanel({
 
                     <div className="flex flex-col gap-1">
 
-                        {terminals.map((name) => (
-
-                            <Button
-                                key={name}
-                                variant="ghost"
-                                onClick={() =>
-                                    setActiveTerminal(name)
-                                }
-                                className={
-                                    `justify-start text-xs rounded-none h-8 px-2 ` +
-                                    (activeTerminal === name
-                                        ? "bg-zinc-900 text-white"
-                                        : "text-zinc-400 hover:bg-zinc-800/50")
-                                }
+                        {terminals.map((terminal) => (
+                            <div
+                                key={terminal.id}
+                                className="flex items-center justify-between"
                             >
-
-                                {name}
-
-                            </Button>
-
+                                <Button
+                                    key={terminal.id}
+                                    variant="ghost"
+                                    onClick={() =>
+                                        setActiveTerminal(terminal.id)
+                                    }
+                                    className={
+                                        `justify-start text-xs rounded-none h-8 px-2 ` +
+                                        (activeTerminalId === terminal.id
+                                            ? "bg-zinc-900 text-white"
+                                            : "text-zinc-400 hover:bg-zinc-800/50")
+                                    }
+                                >
+                                    {terminal.name}
+                                </Button>
+                                {terminal.previews.length > 0 ? (
+                                    terminal.previews.length === 1 ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => window.open(
+                                                terminal.previews[0].url,
+                                                "_blank"
+                                            )}
+                                            className=" h-6 text-xs bg-emerald-900/30 border-emerald-700 text-emerald-400"
+                                        >
+                                            Preview
+                                        </Button>
+                                    ) : (
+                                        <select
+                                            className="h-6 text-xs bg-emerald-900/30 text-emerald-400"
+                                            onChange={(e) => window.open(
+                                                e.target.value,
+                                                "_blank"
+                                            )}
+                                        >
+                                            <option>
+                                                Preview
+                                            </option>
+                                            {terminal.previews.map(
+                                                (preview, i) => (
+                                                    <option
+                                                        key={preview.id}
+                                                        value={preview.url}
+                                                    >
+                                                        {preview.name || `Preview ${i + 1}`}
+                                                    </option>
+                                                )
+                                            )}
+                                        </select>
+                                    )
+                                ) : (
+                                    <Button
+                                        size="sm"
+                                        disabled
+                                        className="h-6 text-xs"
+                                    >
+                                        Preview
+                                    </Button>
+                                )}
+                            </div>
                         ))}
 
                     </div>

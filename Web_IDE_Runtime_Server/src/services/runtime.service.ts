@@ -149,7 +149,6 @@ export async function pingRuntimeService(
     }
 
     lastUsedMap.set(projectId, Date.now())
-    runtimeLogger.kittyDebug("Ping: running ", { projectId, port: container.port })
 
     return {
         status: "running",

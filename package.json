@@ -9,8 +9,8 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@11.0.9",
-    "engines": {
+  "packageManager": "pnpm@11.8.0",
+  "engines": {
     "node": "22.x"
   }
 }

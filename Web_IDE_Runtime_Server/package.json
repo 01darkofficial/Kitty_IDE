@@ -12,7 +12,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@11.8.0",
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/dockerode": "^4.0.1",

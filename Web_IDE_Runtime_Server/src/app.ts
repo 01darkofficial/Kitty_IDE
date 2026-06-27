@@ -1,9 +1,10 @@
 import express from "express"
+import cors from "cors"
+import "./runtime/terminalCleanup"
 import startRuntimeRoute from "./routes/runtime.routes"
 import projectRoutes from "./routes/project.routes"
 import pingRoute from "./routes/activity.routes"
 import filesRoute from "./routes/files.routes"
-import cors from "cors"
 
 const app = express()
 
