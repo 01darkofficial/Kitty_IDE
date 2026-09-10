@@ -1,26 +1,49 @@
+"use client"
+
+import { FolderTree } from "lucide-react"
 import { buildTree } from "@/lib/fileSystem/buildTree"
-import TreeNode from "./TreeNode"
 import { FileNode } from "@/types/db"
+import TreeNode from "./TreeNode"
 
-export default function ProjectFileSection({ files }: { files: FileNode[] }) {
+interface ProjectFileSectionProps {
+    files: FileNode[];
+}
 
-    const tree = buildTree(files)
+export default function ProjectFileSection({ files }: ProjectFileSectionProps) {
+
+    const tree = buildTree(files);
+    const fileCount = files.filter((f) => f.type === "file").length;
 
     return (
-        <div className="border border-zinc-800 rounded-lg overflow-hidden bg-zinc-900 flex flex-col h-full">
 
-            <div className="px-4 py-3 border-b border-zinc-800 text-sm font-medium text-zinc-300">
-                Files
+        <section className="flex min-h-105 lg:h-110 flex-col overflow-hidden rounded-sm border border-outline bg-surface">
+            <div className="flex items-center justify-between border-b border-outline px-4 py-4 sm:px-5">
+                <div className="flex items-center gap-3">
+                    <FolderTree size={18} className="text-foreground-muted" />
+
+                    <div>
+                        <h2 className="font-medium text-foreground">
+                            Project Structure
+                        </h2>
+
+                        <p className="mt-1 text-xs text-foreground-subtle">
+                            {fileCount} files
+                        </p>
+                    </div>
+                </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto py-3 px-2 no-scrollbar">
-
-                {tree.map((node) => (
-                    <TreeNode key={node.id} node={node} />
-                ))}
-
+            <div className="flex-1 overflow-y-auto p-2 no-scrollbar">
+                {tree.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-sm text-foreground-subtle">
+                        No files found.
+                    </div>
+                ) : (
+                    tree.map((node) => (
+                        <TreeNode key={node.id} node={node} />
+                    ))
+                )}
             </div>
-
-        </div>
+        </section>
     )
 }

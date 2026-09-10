@@ -1,37 +1,48 @@
+import { ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Props = {
     icon: React.ElementType
     label: string
-    onClick?: () => void
+    description: string
+    onClick: () => void
 }
 
-export default function QuickActionCard({
-    icon: Icon,
-    label,
-    onClick,
-}: Props) {
+export default function QuickActionCard({ icon: Icon, label, description, onClick }: Props) {
     return (
         <button
             onClick={onClick}
             className={cn(
-                "flex flex-col items-center justify-center",
-                "w-32 h-32",
-                "bg-neutral-900 border border-neutral-800",
-                "rounded-xl",
-                "hover:bg-neutral-800 hover:border-neutral-700",
-                "transition-all"
+                "group flex items-center justify-between",
+                "rounded-sm border border-outline bg-surface",
+                "px-5 py-4 cursor-pointer",
+                "transition-all duration-200",
+                "hover:bg-surface-hover"
             )}
         >
-            <Icon
-                size={32}
-                className="text-neutral-300 mb-3"
+            <div className="flex min-w-0 w-full items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xsm bg-canvas border border-outline">
+                    <Icon
+                        size={20}
+                        className="text-foreground-muted"
+                    />
+                </div>
+
+                <div className="min-w-0 flex-1 text-left">
+                    <h3 className="text-sm font-semibold text-foreground">
+                        {label}
+                    </h3>
+
+                    <p className="mt-1 wrap-break-words text-xs text-foreground-subtle">
+                        {description}
+                    </p>
+                </div>
+            </div>
+
+            <ArrowRight
+                size={18}
+                className=" ml-4 shrink-0 text-foreground-subtle transition-transform duration-150 group-hover:translate-x-1 sm:self-auto"
             />
-
-            <span className="text-sm text-neutral-200">
-                {label}
-            </span>
-
         </button>
     )
 }

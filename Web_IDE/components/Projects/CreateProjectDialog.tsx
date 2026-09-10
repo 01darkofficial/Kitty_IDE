@@ -5,31 +5,14 @@ import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useState, useEffect } from "react"
+import { ChevronDown } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { projectSchema } from "@/lib/validation/project"
-
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-} from "@/components/shadcn/ui/dialog"
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/shadcn/ui/dialog"
 import { Input } from "@/components/shadcn/ui/input"
 import { Label } from "@/components/shadcn/ui/label"
 import { Button } from "@/components/shadcn/ui/button"
-
-import {
-    Select,
-    SelectTrigger,
-    SelectValue,
-    SelectContent,
-    SelectItem,
-} from "@/components/shadcn/ui/select"
-
-import { Switch } from "@/components/shadcn/ui/switch"
-import { ChevronDown } from "lucide-react"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, } from "@/components/shadcn/ui/select"
 import { useProjectStore } from "@/store/projectStore"
 
 type ProjectForm = {
@@ -42,7 +25,7 @@ type ProjectForm = {
     }
 }
 
-interface Props {
+interface CreateProjectDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
 }
@@ -50,22 +33,14 @@ interface Props {
 export default function CreateProjectDialog({
     open,
     onOpenChange,
-}: Props) {
+}: CreateProjectDialogProps) {
 
     const router = useRouter()
 
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [loading, setLoading] = useState(false)
-
     const createProject = useProjectStore(s => s.createProject)
-
-    const {
-        register,
-        handleSubmit,
-        setValue,
-        watch,
-        formState: { errors },
-    } = useForm<ProjectForm>({
+    const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<ProjectForm>({
         resolver: zodResolver(projectSchema as any),
         defaultValues: {
             runtime: "static",
@@ -79,52 +54,33 @@ export default function CreateProjectDialog({
 
     const name = watch("name")
     const runtime = watch("runtime")
+    const visibility = watch("visibility");
+    const activeCard = "border-accent bg-surface-active";
+    const inactiveCard = "border-outline bg-surface hover:bg-surface-hover";
 
-    const slug = name
-        ?.trim()
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "") || ""
+    const slug = name?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || ""
 
-    /**
-     * Reset runtime_env when switching to static
-     */
     useEffect(() => {
-
         if (runtime === "static") {
-
             setShowAdvanced(false)
-
-            setValue("runtime_env", {
-                node: "25",
-                pnpm: "10"
-            })
-
+            setValue("runtime_env", { node: "25", pnpm: "10" })
         }
-
     }, [runtime, setValue])
 
     const onSubmit = async (values: ProjectForm) => {
 
         try {
-
             setLoading(true)
-
-            const payload =
-                values.runtime === "node"
-                    ? {
-                        name: slug,
-                        runtime: "node" as const,
-                        runtime_env: values.runtime_env,
-                        visibility: values.visibility
-                    }
-                    : {
-                        name: slug,
-                        runtime: "static" as const,
-                        visibility: values.visibility
-                    }
-
-            console.log(payload)
+            const payload = values.runtime === "node" ? {
+                name: slug,
+                runtime: "node" as const,
+                runtime_env: values.runtime_env,
+                visibility: values.visibility
+            } : {
+                name: slug,
+                runtime: "static" as const,
+                visibility: values.visibility
+            }
 
             const project = await createProject(payload)
 
@@ -146,302 +102,238 @@ export default function CreateProjectDialog({
     }
 
     return (
-
         <Dialog open={open} onOpenChange={onOpenChange}>
-
-            <DialogContent className="sm:max-w-lg bg-zinc-900">
-
-                <DialogHeader>
-
-                    <DialogTitle>
-                        Create New Project
+            <DialogContent className="w-[calc(100vw-2rem)] max-w-xl rounded-sm border-outline bg-surface px-0 py-2 max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto no-scrollbar sm:w-full sm:max-h-[90dvh] lg:max-h-[80dvh]">
+                <DialogHeader className="px-5 pt-5 pb-2 sm:px-6 lg:px-7">
+                    <DialogTitle className="text-2xl">
+                        New Project
                     </DialogTitle>
 
                     <DialogDescription>
-                        Select a template to start your project.
+                        Create a new development workspace.
                     </DialogDescription>
-
                 </DialogHeader>
 
-                <form
-                    onSubmit={handleSubmit(onSubmit)}
-                    className="space-y-6 py-4"
-                >
+                <form onSubmit={handleSubmit(onSubmit)} className="flex h-full flex-col">
+                    <div className="flex-1 px-5 py-5 space-y-8 sm:px-6 lg:px-7">
+                        <div className="space-y-2">
+                            <Label>
+                                Project Name
+                            </Label>
 
-                    {/* Project Name */}
+                            <Input
+                                {...register("name")}
+                                placeholder="portfolio"
+                                className="rounded"
+                            />
 
-                    <div className="space-y-2">
+                            {errors.name && (
+                                <p className="text-xs text-danger">
+                                    {errors.name.message}
+                                </p>
+                            )}
+                        </div>
 
-                        <Label>
-                            Project Name
-                        </Label>
+                        <div className="space-y-3">
+                            <Label>
+                                Runtime
+                            </Label>
 
-                        <Input
-                            {...register("name")}
-                            placeholder="my-project"
-                        />
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setValue("runtime", "static")}
+                                    className={cn(
+                                        "rounded border p-5 text-left transition-all duration-150",
+                                        runtime === "static" ? activeCard : inactiveCard
+                                    )}
+                                >
+                                    <h3 className="font-medium text-foreground">
+                                        Static
+                                    </h3>
 
-                        {slug && (
+                                    <p className="mt-1 text-sm text-foreground-subtle">
+                                        HTML, CSS & JavaScript
+                                    </p>
+                                </button>
 
-                            <p className="text-xs text-muted-foreground">
+                                <button
+                                    type="button"
+                                    onClick={() => setValue("runtime", "node")}
+                                    className={cn(
+                                        "rounded border p-5 text-left transition-all duration-150",
+                                        runtime === "node" ? activeCard : inactiveCard
+                                    )}
+                                >
+                                    <h3 className="font-medium text-foreground">
+                                        Node.js
+                                    </h3>
 
-                                Slug: {slug}
+                                    <p className="mt-1 text-sm text-foreground-subtle">
+                                        Backend & Fullstack
+                                    </p>
+                                </button>
+                            </div>
+                        </div>
 
-                            </p>
+                        <div className="space-y-3">
+                            <Label>
+                                Visibility
+                            </Label>
 
-                        )}
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setValue("visibility", "private")}
+                                    className={cn(
+                                        "rounded border p-4 text-left transition-all duration-150",
+                                        visibility === "private" ? activeCard : inactiveCard
+                                    )}
+                                >
+                                    <h3 className="font-medium text-foreground">
+                                        Private
+                                    </h3>
 
-                        {errors.name && (
+                                    <p className="mt-1 text-sm text-foreground-subtle">
+                                        Only you can access this project.
+                                    </p>
+                                </button>
 
-                            <p className="text-xs text-red-500">
+                                <button
+                                    type="button"
+                                    onClick={() => setValue("visibility", "public")}
+                                    className={cn(
+                                        "rounded border p-4 text-left transition-all duration-150",
+                                        visibility === "public" ? activeCard : inactiveCard
+                                    )}
+                                >
+                                    <h3 className="font-medium text-foreground">
+                                        Public
+                                    </h3>
 
-                                {errors.name.message}
+                                    <p className="mt-1 text-sm text-foreground-subtle">
+                                        Anyone with the link can view it.
+                                    </p>
+                                </button>
+                            </div>
+                        </div>
 
-                            </p>
+                        {runtime === "node" && (
 
-                        )}
+                            <div className="space-y-3">
 
-                    </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAdvanced(!showAdvanced)}
+                                    className="flex w-full items-center justify-between rounded border border-outline bg-surface px-4 py-3 transition-colors hover:bg-surface-hover"
+                                >
+                                    <div>
+                                        <p className="font-medium text-foreground">
+                                            Advanced
+                                        </p>
 
-                    {/* Runtime */}
+                                        <p className="mt-1 text-xs text-foreground-subtle">
+                                            Configure the runtime environment.
+                                        </p>
+                                    </div>
 
-                    <div className="space-y-2">
+                                    <ChevronDown
+                                        className={cn(
+                                            "h-4 w-4 transition-transform",
+                                            showAdvanced && "rotate-180"
+                                        )}
+                                    />
+                                </button>
 
-                        <Label>
-                            Runtime
-                        </Label>
-
-                        <Select
-                            defaultValue="static"
-
-                            onValueChange={(v) =>
-                                setValue(
-                                    "runtime",
-                                    v as ProjectForm["runtime"]
-                                )
-                            }
-                        >
-
-                            <SelectTrigger>
-
-                                <SelectValue />
-
-                            </SelectTrigger>
-
-                            <SelectContent>
-
-                                <SelectItem value="static">
-                                    Static
-                                </SelectItem>
-
-                                <SelectItem value="node">
-                                    Node
-                                </SelectItem>
-
-                            </SelectContent>
-
-                        </Select>
-
-                    </div>
-
-                    {/* Advanced (ONLY FOR NODE) */}
-
-                    {runtime === "node" && (
-
-                        <div>
-
-                            <button
-                                type="button"
-
-                                onClick={() =>
-                                    setShowAdvanced(!showAdvanced)
-                                }
-
-                                className="flex items-center text-sm text-muted-foreground"
-                            >
-
-                                <ChevronDown
-                                    className={`mr-1 h-4 w-4 transition-transform ${showAdvanced
-                                        ? "rotate-180"
-                                        : ""
-                                        }`}
-                                />
-
-                                Advanced Settings
-
-                            </button>
-
-                            {showAdvanced && (
-
-                                <div className="mt-4 space-y-4 border-t pt-4">
-
-                                    {/* Runtime Environment */}
-
-                                    <div className="space-y-4">
-
-                                        {/* Node Version */}
-
+                                {showAdvanced && (
+                                    <div className="space-y-5 rounded border border-outline bg-surface p-5">
                                         <div className="space-y-2">
-
                                             <Label>
                                                 Node Version
                                             </Label>
 
                                             <Select
                                                 defaultValue="25"
-
-                                                onValueChange={(v) =>
-                                                    setValue(
-                                                        "runtime_env.node",
-                                                        v
-                                                    )
-                                                }
+                                                onValueChange={(v) => setValue("runtime_env.node", v)}
                                             >
-
-                                                <SelectTrigger>
-
+                                                <SelectTrigger className="rounded">
                                                     <SelectValue />
-
                                                 </SelectTrigger>
 
-                                                <SelectContent>
-
-                                                    <SelectItem value="25">
-                                                        Node 25 (latest)
+                                                <SelectContent className="rounded border-outline bg-surface text-foreground shadow-lg">
+                                                    <SelectItem className="hover:rounded" value="25">
+                                                        Node 25 (Current)
                                                     </SelectItem>
 
-                                                    <SelectItem value="24">
+                                                    <SelectItem className="hover:rounded" value="24">
                                                         Node 24 (LTS)
                                                     </SelectItem>
 
-                                                    <SelectItem value="20">
+                                                    <SelectItem className="hover:rounded" value="20">
                                                         Node 20
                                                     </SelectItem>
 
-                                                    <SelectItem value="18">
+                                                    <SelectItem className="hover:rounded" value="18">
                                                         Node 18
                                                     </SelectItem>
-
                                                 </SelectContent>
-
                                             </Select>
-
                                         </div>
 
-                                        {/* pnpm Version */}
-
                                         <div className="space-y-2">
-
                                             <Label>
                                                 pnpm Version
                                             </Label>
 
                                             <Select
                                                 defaultValue="10"
-
-                                                onValueChange={(v) =>
-                                                    setValue(
-                                                        "runtime_env.pnpm",
-                                                        v
-                                                    )
-                                                }
+                                                onValueChange={(v) => setValue("runtime_env.pnpm", v)}
                                             >
-
-                                                <SelectTrigger>
-
+                                                <SelectTrigger className="rounded">
                                                     <SelectValue />
-
                                                 </SelectTrigger>
 
-                                                <SelectContent>
-
-                                                    <SelectItem value="10">
-                                                        pnpm 10 (latest)
+                                                <SelectContent className="rounded border-outline bg-surface text-foreground shadow-lg">
+                                                    <SelectItem className="hover:rounded" value="10">
+                                                        pnpm 10
                                                     </SelectItem>
 
-                                                    <SelectItem value="9">
+                                                    <SelectItem className="hover:rounded" value="9">
                                                         pnpm 9
                                                     </SelectItem>
 
-                                                    <SelectItem value="8">
+                                                    <SelectItem className="hover:rounded" value="8">
                                                         pnpm 8
                                                     </SelectItem>
-
                                                 </SelectContent>
-
                                             </Select>
-
                                         </div>
-
                                     </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
 
-                                    {/* Visibility */}
-
-                                    <div className="flex items-center justify-between">
-
-                                        <Label>
-                                            Public Project
-                                        </Label>
-
-                                        <Switch
-
-                                            onCheckedChange={(checked) =>
-
-                                                setValue(
-                                                    "visibility",
-
-                                                    checked
-                                                        ? "public"
-                                                        : "private"
-                                                )
-                                            }
-
-                                        />
-
-                                    </div>
-
-                                </div>
-
-                            )}
-
-                        </div>
-
-                    )}
-
-                    <DialogFooter>
-
+                    <DialogFooter className="border-t border-outline px-5 py-4 sm:px-6 flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                         <Button
                             type="button"
-                            variant="ghost"
-
-                            onClick={() =>
-                                onOpenChange(false)
-                            }
+                            variant="outline"
+                            onClick={() => onOpenChange(false)}
+                            className="h-11 w-full rounded-sm border-outline bg-surface text-foreground hover:bg-surface-hover sm:w-auto sm:min-w-28"
                         >
-
                             Cancel
-
                         </Button>
 
                         <Button
                             type="submit"
                             disabled={loading}
+                            className="h-11 w-full rounded-sm bg-neutral-900 text-neutral-0 hover:bg-neutral-800-active disabled:bg-neutral-900-hover disabled:text-neutral-400 sm:w-auto sm:min-w-36"
                         >
-
-                            {loading
-                                ? "Creating..."
-                                : "Create Project"}
-
+                            {loading ? "Creating..." : "Create Project"}
                         </Button>
-
                     </DialogFooter>
-
                 </form>
-
             </DialogContent>
-
-        </Dialog>
-
+        </Dialog >
     )
-
 }

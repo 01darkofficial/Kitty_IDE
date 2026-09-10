@@ -6,7 +6,7 @@ import { Button } from "@/components/shadcn/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/shadcn/ui/tooltip"
 import { buildTree } from "@/lib/fileSystem/buildTree"
 import { useExplorerStore } from "@/store/explorerStore"
-import { ExplorerAction, FileType } from "@/types/components/ide"
+import { ExplorerAction } from "@/types/components/ide"
 import { FileNode } from "@/types/db"
 
 interface ExplorerPanelProps {
@@ -32,8 +32,7 @@ export default function ExplorerPanel({
     const activeContainerId = useExplorerStore(s => s.activeContainerId)
 
     return (
-        <div className="w-64 border-r border-zinc-800 bg-zinc-900 flex flex-col">
-            {/* Header */}
+        <div className="flex h-full w-full flex-col border-r border-zinc-800 bg-zinc-900">
             <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
                 <span className="text-xs uppercase text-zinc-400">
                     Explorer
@@ -44,18 +43,16 @@ export default function ExplorerPanel({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7"
-                                onClick={() =>
-                                    setCreatingNode({
-                                        parentId:
-                                            activeContainerId,
-                                        type: "file"
-                                    })
-                                }
+                                className="h-8 w-8 rounded-xsm hover:bg-zinc-800 transition-colors"
+                                onClick={() => setCreatingNode({
+                                    parentId: activeContainerId,
+                                    type: "file"
+                                })}
                             >
                                 <FilePlus className="h-4 w-4" />
                             </Button>
                         </TooltipTrigger>
+
                         <TooltipContent>
                             New File
                         </TooltipContent>
@@ -65,19 +62,16 @@ export default function ExplorerPanel({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7"
-
-                                onClick={() =>
-                                    setCreatingNode({
-                                        parentId:
-                                            activeContainerId,
-                                        type: "folder"
-                                    })
-                                }
+                                className="h-8 w-8 rounded-xsm hover:bg-zinc-800 transition-colors"
+                                onClick={() => setCreatingNode({
+                                    parentId: activeContainerId,
+                                    type: "folder"
+                                })}
                             >
                                 <FolderPlus className="h-4 w-4" />
                             </Button>
                         </TooltipTrigger>
+
                         <TooltipContent>
                             New Folder
                         </TooltipContent>
@@ -87,29 +81,22 @@ export default function ExplorerPanel({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7"
-                                onClick={() =>
-                                    onAction(
-                                        "refresh",
-                                        null
-                                    )
-                                }
+                                className="h-8 w-8 rounded-xsm hover:bg-zinc-800 transition-colors"
+                                onClick={() => onAction("refresh", null)}
                             >
                                 <RefreshCcw className="h-4 w-4" />
                             </Button>
                         </TooltipTrigger>
+
                         <TooltipContent>Refresh</TooltipContent>
                     </Tooltip>
                 </div>
             </div>
-            {/* Tree */}
+
             <div
-                className="flex-1 overflow-auto"
+                className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar"
                 onClick={(e) => {
-                    if (
-                        e.target ===
-                        e.currentTarget
-                    ) {
+                    if (e.target === e.currentTarget) {
                         onSelectRoot()
                     }
                 }}

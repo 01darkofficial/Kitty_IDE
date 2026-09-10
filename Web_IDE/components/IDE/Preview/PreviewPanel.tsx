@@ -1,43 +1,30 @@
 "use client"
 
 import { RefObject, useEffect } from "react"
+import { useWorkspaceStore } from "@/store/workspaceStore"
 
 interface PreviewPanelProps {
     projectId: string
     iframeRef: RefObject<HTMLIFrameElement | null>
 }
 
-export default function PreviewPanel({
-    projectId,
-    iframeRef
-}: PreviewPanelProps) {
+export default function PreviewPanel({ projectId, iframeRef }: PreviewPanelProps) {
 
-    /*
-      Load preview automatically
-      when panel mounts
-    */
+    const isResizing = useWorkspaceStore((s) => s.isResizing)
 
     useEffect(() => {
-
         if (!iframeRef.current) return
-
-        iframeRef.current.src =
-            `/preview/${projectId}/index.html?ts=${Date.now()}`
-
+        iframeRef.current.src = `/preview/${projectId}/index.html?ts=${Date.now()}`
     }, [projectId])
 
     return (
-
-        <div className="w-[40%] border-l border-zinc-800 bg-zinc-900 relative">
-
+        <div className="relative h-full w-full shrink-0 overflow-hidden border-zinc-800 bg-zinc-900">
             <iframe
                 ref={iframeRef}
                 title="preview"
                 sandbox="allow-scripts allow-same-origin"
-                className="w-full h-full"
+                className={`h-full w-full ${isResizing ? "pointer-events-none" : ""}`}
             />
-
         </div>
-
     )
 }

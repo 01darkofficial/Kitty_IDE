@@ -25,7 +25,7 @@ export default function MonacoEditor({ file, onChange }: any) {
     const language = getLanguage(file.name)
 
     return (
-        <div className="flex-1">
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
             <Editor
                 height="100%"
                 theme="vs-dark"

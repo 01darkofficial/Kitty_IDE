@@ -1,93 +1,169 @@
-"use client"
+"use client";
 
-import { Package } from "lucide-react"
-import { cleanZip } from "@/lib/import/cleanZip"
-import { uploadProjectZip } from "@/lib/import/uploadProjectZip"
-import { importLogger } from "@/utils/logger"
-import { useRouter } from "next/navigation"
-import { useProjectStore } from "@/store/projectStore"
+import { useRef, useState } from "react"
+import { Archive, CircleCheck, FolderOpen, RefreshCw } from "lucide-react"
+import { Button } from "@/components/shadcn/ui/button"
+import { cn } from "@/lib/utils"
 
-type Props = {
-    projectType: string
-    nodeVersion: string
-    pnpmVersion: string
+type UploadZipBoxProps = {
+    file: File | null
+    setFile: React.Dispatch<React.SetStateAction<File | null>>
+    projectType: "node" | "static"
 }
 
 export default function UploadZipBox({
-    projectType,
-    nodeVersion,
-    pnpmVersion,
-}: Props) {
+    file,
+    setFile,
+    projectType
+}: UploadZipBoxProps) {
 
-    const router = useRouter()
+    const inputRef = useRef<HTMLInputElement>(null)
+    const [dragging, setDragging] = useState(false)
 
-    const addProject = useProjectStore(s => s.addProject)
+    function browseFiles() {
+        inputRef.current?.click()
+    }
 
-    async function handleFileChange(
-        e: React.ChangeEvent<HTMLInputElement>
-    ) {
-        try {
-            const file = e.target.files?.[0]
+    function handleFileSelection(selected: File | undefined) {
+        if (!selected) return
 
-            if (!file) return
-
-            const cleanedZip = await cleanZip(file)
-
-            const result = await uploadProjectZip({
-                file: cleanedZip,
-                filename: file.name,
-                projectType,
-                nodeVersion,
-                pnpmVersion,
-            })
-
-            addProject(result.project)
-
-            router.push(`/app/projects/${result.project.id}`)
-
-            importLogger.kittyLog("upload success")
-
-        } catch (err) {
-            importLogger.kittyError(err)
+        if (!selected.name.endsWith(".zip")) {
+            return
         }
+
+        setFile(selected)
+    }
+
+    function onInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+        handleFileSelection(e.target.files?.[0])
+    }
+
+    function onDrop(e: React.DragEvent<HTMLDivElement>) {
+        e.preventDefault()
+        setDragging(false)
+        handleFileSelection(e.dataTransfer.files?.[0])
     }
 
     return (
-        <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 p-8 flex items-center justify-between">
+        <>
+            <input
+                ref={inputRef}
+                type="file"
+                hidden
+                accept=".zip"
+                onChange={onInputChange}
+            />
 
-            <div className="flex items-center gap-4">
+            {!file ? (
+                <div
+                    onClick={browseFiles}
+                    onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={onDrop}
+                    className={cn(
+                        "cursor-pointer rounded-sm border-2 border-dashed p-12 transition-all",
+                        dragging ? "border-accent bg-surface-active" : "border-outline bg-canvas hover:border-accent hover:bg-surface-hover"
+                    )}
 
-                <div className="h-12 w-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                    <Package className="h-5 w-5 text-zinc-400" />
+                >
+                    <div className="flex flex-col items-center text-center">
+                        <Archive
+                            size={42}
+                            className="mb-5 text-foreground-subtle"
+                        />
+
+                        <h3 className="text-lg font-medium text-foreground">
+
+                            Drag & Drop ZIP Archive
+
+                        </h3>
+
+                        <p className="mt-2 text-sm text-foreground-subtle">
+
+                            or click anywhere to browse
+
+                        </p>
+
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="mt-6"
+                        >
+                            <FolderOpen
+                                size={16}
+                                className="mr-2"
+                            />
+
+                            Choose ZIP File
+                        </Button>
+
+                        <p className="mt-5 text-xs text-foreground-subtle">
+                            Supports .zip archives
+                        </p>
+                    </div>
                 </div>
+            ) : (
+                <div className="rounded-sm border border-outline bg-canvas p-6">
+                    <div className="flex items-start justify-between">
+                        <div className="flex gap-4">
+                            <div className="flex h-12 w-12 items-center justify-center rounded bg-surface border border-outline">
+                                <Archive
+                                    size={22}
+                                    className="text-accent"
+                                />
+                            </div>
 
-                <div>
+                            <div>
+                                <h3 className="font-medium text-foreground">
+                                    {file.name}
+                                </h3>
 
-                    <h4 className="font-medium text-zinc-200">
-                        Upload ZIP File
-                    </h4>
+                                <div className="mt-3 space-y-1 text-sm">
+                                    <div className="flex gap-2">
+                                        <span className="text-foreground-subtle">
+                                            Size:
+                                        </span>
 
-                    <p className="text-sm text-zinc-500 mt-1">
-                        node_modules and build folders are excluded automatically.
-                    </p>
+                                        <span className="text-foreground">
+                                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                                        </span>
+                                    </div>
 
+                                    <div className="flex gap-2">
+                                        <span className="text-foreground-subtle">
+                                            Runtime:
+                                        </span>
+
+                                        <span className="text-foreground">
+                                            {projectType === "node" ? "Node.js" : "Static"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 flex items-center gap-2 text-sm text-green-600">
+                                    <CircleCheck size={16} />
+
+                                    Ready to import
+                                </div>
+                            </div>
+                        </div>
+
+                        <Button
+                            variant="ghost"
+                            onClick={browseFiles}
+                        >
+                            <RefreshCw
+                                size={15}
+                                className="mr-2"
+                            />
+                            Change
+                        </Button>
+                    </div>
                 </div>
-
-            </div>
-
-            <label className="rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 transition-colors px-5 py-3 text-sm text-zinc-200 cursor-pointer">
-
-                Select File
-
-                <input
-                    type="file"
-                    accept=".zip"
-                    className="hidden"
-                    onChange={handleFileChange}
-                />
-
-            </label>
-
-        </div>
+            )}
+        </>
     )
 }

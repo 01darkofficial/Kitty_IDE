@@ -1,5 +1,8 @@
-type Props = {
-    title: string
+"use client";
+
+import { cn } from "@/lib/utils"
+
+type VersionSelectorProps = {
     versions: string[]
     selected: string
     onSelect: (version: string) => void
@@ -7,39 +10,39 @@ type Props = {
 }
 
 export default function VersionSelector({
-    title,
     versions,
     selected,
     onSelect,
     prefix,
-}: Props) {
-
+}: VersionSelectorProps) {
     return (
-        <div>
-
-            <label className="text-sm text-zinc-500 mb-3 block">
-                {title}
-            </label>
-
-            <div className="grid grid-cols-3 gap-3">
-
-                {
-                    versions.map((version) => (
-                        <button
-                            key={version}
-                            onClick={() => onSelect(version)}
-                            className={`rounded-xl border px-4 py-4 transition-all ${selected === version
-                                ? "border-zinc-500 bg-zinc-800 text-zinc-100"
-                                : "border-zinc-800 bg-zinc-900/40 text-zinc-500 hover:border-zinc-700"
-                                }`}
-                        >
+        <div className="grid grid-cols-3 gap-3">
+            {versions.map((version) => {
+                const active = selected === version;
+                return (
+                    <button
+                        key={version}
+                        type="button"
+                        onClick={() => onSelect(version)}
+                        className={cn(
+                            "rounded-sm border p-4 transition-all duration-150",
+                            active
+                                ? "border-accent bg-surface-active text-foreground shadow-sm"
+                                : "border-outline bg-surface text-foreground-muted hover:border-accent hover:bg-surface-hover  hover:text-foreground"
+                        )}
+                    >
+                        <div className="text-sm font-medium">
                             {prefix} {version}
-                        </button>
-                    ))
-                }
+                        </div>
 
-            </div>
-
+                        {version === versions[0] && (
+                            <div className="mt-1 text-xs text-foreground-subtle">
+                                Recommended
+                            </div>
+                        )}
+                    </button>
+                );
+            })}
         </div>
-    )
+    );
 }

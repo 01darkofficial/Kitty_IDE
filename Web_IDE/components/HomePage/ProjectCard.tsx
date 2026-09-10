@@ -1,43 +1,57 @@
-import { Folder } from "lucide-react"
+import { ArrowRight, Folder } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type Props = {
+type ProjectCardProps = {
     name: string
-    lastOpened: string
-    onClick?: () => void
+    updatedAt: string
+    onClick: () => void
 }
 
-export default function ProjectCard({
-    name,
-    lastOpened,
-    onClick,
-}: Props) {
+export default function ProjectCard({ name, updatedAt, onClick }: ProjectCardProps) {
     return (
         <button
             onClick={onClick}
             className={cn(
-                "flex flex-col items-center justify-center text-center",
-                "w-36 h-36",
-                "bg-neutral-900 border border-neutral-800",
-                "rounded-xl",
-                "hover:bg-neutral-800 hover:border-neutral-700",
-                "hover:scale-[1.02]",
-                "transition-all"
+                "group w-full rounded-sm border border-outline bg-surface p-5 text-left",
+                "transition-colors duration-150 cursor-pointer",
+                "hover:bg-surface-hover"
             )}
         >
-            <Folder
-                size={36}
-                className="text-neutral-300 mb-3"
-            />
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xsm bg-canvas border border-outline">
+                        <Folder
+                            size={20}
+                            className="text-foreground-muted"
+                        />
+                    </div>
 
-            <span className="text-sm font-medium text-neutral-200">
-                {name}
-            </span>
+                    <div className="min-w-0">
+                        <h3 className="truncate text-sm font-semibold text-foreground">
+                            {name}
+                        </h3>
 
-            <span className="text-xs text-neutral-500 mt-1">
-                {lastOpened}
-            </span>
+                        <p className="mt-1 wrap-break-words text-xs text-foreground-subtle">
+                            Updated {updatedAt}
+                        </p>
+                    </div>
+                </div>
 
+                <ArrowRight
+                    size={18}
+                    className="ml-4 shrink-0 text-foreground-subtle transition-transform duration-200 group-hover:translate-x-1"
+                />
+            </div>
+
+            <div className="mt-5 flex items-center justify-between border-t border-outline pt-4">
+                <span className="text-xs text-foreground-muted">
+                    Project
+                </span>
+
+                <span className="text-sm font-medium text-foreground">
+                    Open
+                </span>
+            </div>
         </button>
     )
 }

@@ -1,4 +1,5 @@
 import { ThemeProvider } from "@/components/themes/ThemeProvider"
+// @ts-ignore
 import "./globals.css"
 // import AuthProvider from "@/components/Auth/AuthProvider"
 import { TooltipProvider } from "@/components/shadcn/ui/tooltip"

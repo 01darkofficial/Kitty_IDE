@@ -1,13 +1,12 @@
-
 import { redirect } from "next/navigation"
-import HomePageSidebar from "@/components/HomePage/Sidebar"
+import HomePageSidebar from "@/components/Sidebar/Sidebar"
 import AuthHydrator from "@/components/Auth/AuthHydrator"
 import { getProfile, getUser } from "@/lib/api/user/user"
 import { Toaster } from "sonner"
+import { getProjects } from "@/lib/api/projects/project"
+import ProjectHydrator from "./ProjectHydrater"
 
-export default async function ProtectedLayout({
-    children,
-}: {
+export default async function ProtectedLayout({ children, }: {
     children: React.ReactNode
 }) {
 
@@ -19,14 +18,17 @@ export default async function ProtectedLayout({
 
     if (!profile) redirect("/login")
 
+    const projects = await getProjects(user.id);
+
     return (
-        <div className="flex h-screen bg-neutral-950">
+        <div className="flex h-dvh overflow-hidden bg-canvas">
             <AuthHydrator user={user} profile={profile} />
+            <ProjectHydrator userId={user.id} projects={projects} />
             <HomePageSidebar />
-            <main className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto">
                 {children}
                 <Toaster richColors />
-            </main>
+            </div>
         </div>
     )
 }

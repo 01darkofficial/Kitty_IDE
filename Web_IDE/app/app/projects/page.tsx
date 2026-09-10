@@ -1,16 +1,14 @@
 
-import ProjectsClient from "@/app/app/projects/ProjectsClient";
-import { Project } from "@/types/db";
-import { getProjects } from "@/lib/api/projects/project";
-import { getUser } from "@/lib/api/user/user";
+import ProjectsClient from "@/app/app/projects/ProjectsClient"
+import { getUser } from "@/lib/api/user/user"
 
 export default async function ProjectsPage() {
 
-    const user = await getUser();
+    const user = await getUser()
 
     if (!user) {
         return (
-            <div className="p-6">
+            <div className="mx-auto max-w-7xl px-4 pt-20 pb-8 sm:px-6 lg:px-8 lg:pt-10 lg:pb-10">
                 <p className="text-muted-foreground">
                     You must be logged in to view projects.
                 </p>
@@ -18,9 +16,7 @@ export default async function ProjectsPage() {
         )
     }
 
-    const projects = await getProjects(user.id);
-
     return (
-        <ProjectsClient projects={(projects ?? []) as Project[]} />
+        <ProjectsClient />
     )
 }

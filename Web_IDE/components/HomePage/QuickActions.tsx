@@ -1,68 +1,58 @@
-import { Plus, Upload, LayoutTemplate } from "lucide-react"
+import { GitBranch, Plus, Upload, } from "lucide-react"
 import QuickActionCard from "./QuickActionCard"
-import { createProject } from "@/lib/api/projects/createProject"
 
-export default function QuickActions({
-    onProjectCreated
-}: {
-    onProjectCreated: () => void
-}) {
+interface QuickActionsProps {
+    onCreate: () => void
+    onImport: () => void
+    onClone: () => void
+}
 
-    async function handleCreateProject() {
-
-        const name =
-            prompt("Enter project name")
-
-        if (!name) return
-
-        await createProject(name)
-
-        onProjectCreated()
-    }
+export default function QuickActions({ onCreate, onImport, onClone }: QuickActionsProps) {
 
     const actions = [
         {
             label: "New Project",
+            description: "Create a new cloud workspace",
             icon: Plus,
+            onClick: onCreate,
         },
         {
             label: "Import Project",
+            description: "Import a project from a ZIP file",
             icon: Upload,
+            onClick: onImport
         },
         {
-            label: "Templates",
-            icon: LayoutTemplate,
+            label: "Clone repository",
+            description: "Clone a remote Git repository",
+            icon: GitBranch,
+            onClick: onClone
         },
     ]
 
     return (
-        <section className="mb-12">
+        <section className="mt-10 lg:mt-14">
+            <div className="mb-6">
+                <h2 className="text-lg font-semibold text-foreground">
+                    Quick Actions
+                </h2>
 
-            <h2 className="text-lg font-medium mb-4">
-                Quick Actions
-            </h2>
-
-            <div className="flex gap-6 flex-wrap">
-
-                {actions.map(action => (
-                    action.label == "New Project" ? (
-                        <QuickActionCard
-                            key={action.label}
-                            icon={action.icon}
-                            label={action.label}
-                            onClick={onProjectCreated}
-                        />
-                    ) : (
-                        <QuickActionCard
-                            key={action.label}
-                            icon={action.icon}
-                            label={action.label}
-                        />
-                    )
-                ))}
-
+                <p className="mt-1 text-sm text-foreground-subtle">
+                    Common tasks to help you get started quickly.
+                </p>
             </div>
 
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+                {actions.map((action) => (
+                    <QuickActionCard
+                        key={action.label}
+                        icon={action.icon}
+                        label={action.label}
+                        description={action.description}
+                        onClick={action.onClick}
+                    />
+                ))}
+            </div>
         </section>
     )
 }

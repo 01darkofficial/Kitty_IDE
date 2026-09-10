@@ -1,62 +1,49 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-
-import ProjectPageHeader from "@/components/Projects/ProjectPage/ProjectPageHeader"
-import ProjectTabs from "@/components/Projects/ProjectPage/ProjectTabs"
-import ProjectDetails from "@/components/Projects/ProjectPage/ProjectDetails"
+import ProjectHero from "@/components/Projects/ProjectPage/ProjectHero"
+import ProjectSnapshot from "@/components/Projects/ProjectPage/ProjectSnapshot"
 import ProjectFileSection from "@/components/Projects/ProjectPage/ProjectFileSection"
 import ProjectReadme from "@/components/Projects/ProjectPage/ProjectReadme"
-import { Project, FileNode } from "@/types/db"
+import { FileNode, Project } from "@/types/db"
 import { useFileStore } from "@/store/fileStore"
 
-
 interface ProjectClientProps {
-  project: Project;
+  project: Project
   files: FileNode[]
 }
 
-export default function ProjectPageClient({ project, files }: ProjectClientProps) {
+export default function ProjectPageClient({
+  project,
+  files,
+}: ProjectClientProps) {
 
-  const [activeTab, setActiveTab] = useState("code");
-  const router = useRouter();
-
-  const setFiles = useFileStore((s) => s.setFiles);
+  const router = useRouter()
+  const setFiles = useFileStore((s) => s.setFiles)
 
   useEffect(() => {
     setFiles(files)
   }, [files, setFiles])
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto px-8 py-10">
-
-      <ProjectPageHeader
+    <main className="mx-auto max-w-7xl space-y-8 px-4 pt-20 pb-8 sm:px-6 lg:px-8 lg:pt-10 lg:pb-10">
+      <ProjectHero
         project={project}
         onOpenEditor={() => router.push(`/ide/editor/${project.id}`)}
       />
 
-      <ProjectTabs
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-      />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6">
+          <ProjectSnapshot project={project} files={files} />
+        </div>
 
-      {activeTab === "code" && (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[60vh]">
+        <div className="lg:col-span-2">
+          <ProjectFileSection files={files} />
+        </div>
+      </div>
 
-            <ProjectDetails project={project} />
-
-            <div className="lg:col-span-2 min-h-0 no-scrollbar">
-              <ProjectFileSection files={files} />
-            </div>
-
-          </div>
-
-          <ProjectReadme />
-        </>
-      )}
-
-    </div>
+      <ProjectReadme />
+    </main>
   )
 }

@@ -1,54 +1,39 @@
-import { Button } from "@/components/shadcn/ui/button"
+import { Button } from "@/components/shadcn/ui/button";
 
-export default function OAuthButtons() {
-
-    return (
-        <div className="space-y-3">
-
-            {/* Google */}
-            <Button
-                variant="outline"
-                className="
-                    w-full
-                    bg-neutral-800
-                    border-neutral-700
-                    text-neutral-200
-                    hover:bg-neutral-700
-                    flex
-                    items-center
-                    justify-center
-                    gap-2
-                "
-            >
-                <GoogleIcon />
-                Continue with Google
-            </Button>
-
-            {/* GitHub */}
-            <Button
-                variant="outline"
-                className="
-                    w-full
-                    bg-neutral-800
-                    border-neutral-700
-                    text-neutral-200
-                    hover:bg-neutral-700
-                    flex
-                    items-center
-                    justify-center
-                    gap-2
-                "
-            >
-                <GithubIcon />
-                Continue with GitHub
-            </Button>
-
-        </div>
-    )
+interface OAuthButtonsProps {
+    loading?: boolean
 }
 
+export default function OAuthButtons({
+    loading = false
+}: OAuthButtonsProps) {
+    return (
+        <div className="space-y-3">
+            <Button
+                variant="outline"
+                disabled={loading}
+                className="h-10 sm:h-11 w-full justify-center gap-3 rounded-xsm border-outline bg-canvas text-foreground hover:bg-surface-hover hover:border-neutral-border disabled:opacity-50 disabled:cursor-not-allowed transition-normal">
+                <GoogleIcon />
 
-/* Google SVG */
+                <span className="text-sm sm:text-base">
+                    Continue with Google
+                </span>
+            </Button>
+
+            <Button
+                variant="outline"
+                disabled={loading}
+                className="h-10 sm:h-11 w-full justify-center gap-3 rounded-xsm border-outlinebg-canvas text-foregroundhover:bg-surface-hover hover:border-neutral-border disabled:opacity-50 disabled:cursor-not-allowed transition-normal">
+                <GithubIcon />
+
+                <span className="text-sm sm:text-base">
+                    Continue with GitHub
+                </span>
+            </Button>
+        </div>
+    );
+}
+
 function GoogleIcon() {
     return (
         <svg width="18" height="18" viewBox="0 0 48 48">
@@ -60,12 +45,16 @@ function GoogleIcon() {
     )
 }
 
-
-/* GitHub SVG */
 function GithubIcon() {
     return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+        <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="text-foreground"
+        >
             <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55v-2.17c-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.75 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.52-2.55-.29-5.24-1.27-5.24-5.64 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 015.72 0c2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.18 1.82 1.18 3.07 0 4.38-2.7 5.34-5.27 5.63.41.36.77 1.08.77 2.17v3.22c0 .3.21.66.79.55C20.71 21.39 24 17.08 24 12 24 5.65 18.85.5 12 .5z" />
         </svg>
-    )
+    );
 }

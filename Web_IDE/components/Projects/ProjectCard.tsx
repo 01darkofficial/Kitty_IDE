@@ -1,15 +1,11 @@
-"use client"
+"use client";
 
-import Link from "next/link"
+import Link from "next/link";
 import { useState } from "react"
+import { Folder, MoreVertical, Trash2, Globe, Lock, Boxes, Server } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from "@/components/shadcn/ui/dropdown-menu"
 import { Project } from "@/types/db"
-import { Card, CardHeader, CardTitle, CardContent, } from "@/components/shadcn/ui/card"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/shadcn/ui/dropdown-menu"
+import { useProjectStore } from "@/store/projectStore"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -21,200 +17,148 @@ import {
     AlertDialogTitle,
 } from "@/components/shadcn/ui/alert-dialog"
 import { Button } from "@/components/shadcn/ui/button"
-import { MoreVertical, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import { useProjectStore } from "@/store/projectStore"
 
-interface Props {
-    project: Project
+interface ProjectCardProps {
+    project: Project;
 }
 
-export default function ProjectCard({ project }: Props) {
+export default function ProjectCard({ project }: ProjectCardProps) {
+    const deleteProject = useProjectStore((s) => s.deleteProject)
 
     const [confirmOpen, setConfirmOpen] = useState(false)
-    const [isDeleting, setIsDeleting] = useState(false)
-
-    const deleteProject = useProjectStore(s => s.deleteProject)
-
-    /*
-    Open delete dialog
-    */
-
-    function openDeleteDialog(
-        e: React.MouseEvent
-    ) {
-
-        e.preventDefault()
-        e.stopPropagation()
-
-        setConfirmOpen(true)
-
-    }
-
-    /*
-    Delete project handler
-    */
+    const [loading, setLoading] = useState(false)
 
     async function handleDelete() {
-
-        if (isDeleting) return
+        if (loading) return
 
         try {
-            setIsDeleting(true)
+            setLoading(true)
             await deleteProject(project.id)
             toast.success("Project deleted")
-        }
-        catch (err) {
+        } catch {
             toast.error("Failed to delete project")
-        }
-        finally {
-
-            setIsDeleting(false)
+        } finally {
+            setLoading(false)
             setConfirmOpen(false)
-
         }
-
     }
 
     return (
-
         <>
             <Link href={`/app/projects/${project.id}`}>
+                <div className="group rounded-sm border border-outline bg-surface p-5.5 transition-colors hover:bg-surface-hover">
+                    <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 items-center justify-center rounded bg-canvas border border-outline">
+                                <Folder size={20} className="text-foreground-muted" />
+                            </div>
 
-                <Card className="relative cursor-pointer hover:bg-muted/40 transition-colors bg-zinc-900">
+                            <div>
+                                <h3 className="font-semibold text-foreground">
+                                    {project.name}
+                                </h3>
 
-                    {/* Top-right menu */}
-
-                    <div className="absolute top-2 right-2 z-10">
+                                <p className="mt-1 text-xs text-foreground-subtle">
+                                    Created{" "}
+                                    {new Date(project.created_at).toLocaleDateString()}
+                                </p>
+                            </div>
+                        </div>
 
                         <DropdownMenu>
-
                             <DropdownMenuTrigger asChild>
-
                                 <Button
-                                    variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8"
+                                    variant="ghost"
                                     onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
+                                        e.preventDefault();
+                                        e.stopPropagation();
                                     }}
                                 >
-                                    <MoreVertical className="w-4 h-4" />
+                                    <MoreVertical size={16} />
                                 </Button>
-
                             </DropdownMenuTrigger>
 
-                            <DropdownMenuContent
-                                align="end"
-                                onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                }}
-                            >
-
+                            <DropdownMenuContent className="rounded" align="end">
                                 <DropdownMenuItem
-                                    onClick={openDeleteDialog}
-                                    className="text-red-500 focus:text-red-500"
+                                    className="text-danger hover:rounded"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setConfirmOpen(true);
+                                    }}
                                 >
-
-                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    <Trash2 className="mr-2 h-4 w-4" />
 
                                     Delete
-
                                 </DropdownMenuItem>
-
                             </DropdownMenuContent>
-
                         </DropdownMenu>
-
                     </div>
 
-                    <CardHeader>
+                    <div className="mt-6 flex flex-wrap gap-2">
+                        <span className="inline-flex items-center gap-1 rounded bg-canvas px-2.5 py-1 text-xs text-foreground-muted">
+                            {project.runtime === "node"
+                                ? (
+                                    <>
+                                        <Server size={12} />
+                                        Node
+                                    </>
+                                )
+                                : (
+                                    <>
+                                        <Boxes size={12} />
+                                        Static
+                                    </>
+                                )}
+                        </span>
 
-                        <CardTitle>
-                            {project.name}
-                        </CardTitle>
-
-                    </CardHeader>
-
-                    <CardContent>
-
-                        <p className="text-xs text-muted-foreground">
-
-                            Created:{" "}
-
-                            {new Date(
-                                project.created_at
-                            ).toLocaleDateString()}
-
-                        </p>
-
-                    </CardContent>
-
-                </Card>
-
+                        <span className="inline-flex items-center gap-1 rounded bg-canvas px-2.5 py-1 text-xs text-foreground-muted">
+                            {project.visibility === "public"
+                                ? (
+                                    <>
+                                        <Globe size={12} />
+                                        Public
+                                    </>
+                                )
+                                : (
+                                    <>
+                                        <Lock size={12} />
+                                        Private
+                                    </>
+                                )}
+                        </span>
+                    </div>
+                </div>
             </Link>
 
-            {/* Delete Confirmation Dialog */}
-
-            <AlertDialog
-                open={confirmOpen}
-                onOpenChange={setConfirmOpen}
-            >
-
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                 <AlertDialogContent>
-
                     <AlertDialogHeader>
-
                         <AlertDialogTitle>
-
                             Delete Project
-
                         </AlertDialogTitle>
 
                         <AlertDialogDescription>
-
                             This action cannot be undone.
-                            This will permanently delete{" "}
-
-                            <strong>
-                                {project.name}
-                            </strong>{" "}
-
-                            and all its files.
-
                         </AlertDialogDescription>
-
                     </AlertDialogHeader>
 
                     <AlertDialogFooter>
-
                         <AlertDialogCancel>
-
                             Cancel
-
                         </AlertDialogCancel>
 
                         <AlertDialogAction
                             onClick={handleDelete}
-                            disabled={isDeleting}
-                            className="bg-red-600 hover:bg-red-700"
+                            disabled={loading}
                         >
-
-                            {isDeleting
-                                ? "Deleting..."
-                                : "Delete"}
-
+                            {loading ? "Deleting..." : "Delete"}
                         </AlertDialogAction>
-
                     </AlertDialogFooter>
-
                 </AlertDialogContent>
-
             </AlertDialog>
-
         </>
     )
-
 }

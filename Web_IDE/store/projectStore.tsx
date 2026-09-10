@@ -25,12 +25,13 @@ interface ProjectStore {
     projectIds: string[]
     activeProjectId: string | null
     loading: boolean
-    initialized: boolean
-    hydrateProjects: (projects: Project[]) => void
+    initializedForUserId: string | null
+    lastHydratedAt: number | null
+    hydrateProjects: (userId: string, projects: Project[]) => void
     getProjects: () => Project[]
     getProjectById: (projectId: string) => Project | null
     addProject: (project: Project) => void
-    fetchProjects: () => Promise<void>
+    fetchProjects: (userId: string) => Promise<void>
     createProject: (payload: CreateProjectPayload) => Promise<Project | null>
     deleteProject: (projectId: string) => Promise<void>
     updateProject: (projectId: string, updates: Partial<Project>) => Promise<void>
@@ -43,9 +44,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     projectIds: [],
     activeProjectId: null,
     loading: false,
-    initialized: false,
+    initializedForUserId: null,
+    lastHydratedAt: null,
 
-    hydrateProjects: (projectsArray) => {
+    hydrateProjects: (userId, projectsArray) => {
+        if (get().initializedForUserId === userId) return
+
         const normalized: Record<string, Project> = {}
         const ids: string[] = []
 
@@ -57,7 +61,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         set({
             projects: normalized,
             projectIds: ids,
-            initialized: true
+            initializedForUserId: userId,
+            lastHydratedAt: Date.now()
         })
     },
 
@@ -83,7 +88,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         }))
     },
 
-    fetchProjects: async () => {
+    fetchProjects: async (userId) => {
 
         if (get().loading) {
             return
@@ -111,7 +116,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
             set({
                 projects: normalized,
                 projectIds: ids,
-                initialized: true
+                initializedForUserId: userId
             })
         }
         catch (err) {
@@ -214,7 +219,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
             projects: {},
             projectIds: [],
             activeProjectId: null,
-            initialized: false
+            initializedForUserId: null
         })
     }
 }))

@@ -1,103 +1,85 @@
 "use client"
 
 import { useState } from "react"
-import { Folder, ChevronRight, FolderOpen } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+import { ChevronRight, Folder, FolderOpen } from "lucide-react"
+import { AnimatePresence, motion } from "framer-motion"
+import { cn } from "@/lib/utils"
 import { getFileIcon } from "@/lib/fileSystem/getFileIcon"
+import { TreeNode as Node } from "@/lib/fileSystem/buildTree"
 
-export default function TreeNode({ node, depth = 0 }: any) {
+interface TreeNodeProps {
+    node: Node
+    depth?: number
+}
+
+export default function TreeNode({ node, depth = 0 }: TreeNodeProps) {
 
     const [open, setOpen] = useState(false)
+    const isFolder = node.type === "folder"
 
-    const toggle = () => {
-        if (node.type === "folder") {
-            setOpen(!open)
+    function toggle() {
+        if (isFolder) {
+            setOpen((prev) => !prev)
         }
     }
 
     return (
         <div>
-
-            {/* Row */}
-            <motion.div
-                layout
-                variants={{
-                    open: { opacity: 1, y: 0 },
-                    collapsed: { opacity: 0, y: -4 }
-                }}
+            <div
                 onClick={toggle}
-                className="flex items-center gap-2 h-9 hover:bg-zinc-800 cursor-pointer select-none text-base text-zinc-200"
-                style={{ paddingLeft: `${depth * 14 + 8}px` }}
+                style={{
+                    paddingLeft: `${depth * 14 + 8}px`,
+                }}
+                className={cn(
+                    "group flex min-h-10 cursor-pointer select-none items-center gap-2 rounded px-2",
+                    "transition-colors duration-150",
+                    "hover:bg-surface-hover"
+                )}
             >
+                <div className="flex w-4 justify-center">
+                    {isFolder && (
+                        <motion.div
+                            animate={{ rotate: open ? 90 : 0 }}
+                            transition={{ duration: 0.15 }}
+                        >
+                            <ChevronRight size={14} className="text-foreground-subtle" />
+                        </motion.div>
 
-                {/* Chevron */}
-                <motion.div
-                    animate={{ rotate: open ? 90 : 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="w-4 flex justify-center"
-                >
-                    {node.type === "folder" && <ChevronRight size={14} />}
-                </motion.div>
-
-                {/* Icon */}
-                <div className="w-6 flex items-center justify-center">
-
-                    {node.type === "folder"
-                        ? (open
-                            ? <FolderOpen size={18} className="text-yellow-400" />
-                            : <Folder size={18} className="text-yellow-500" />
-                        )
-                        : getFileIcon(node.name)
-                    }
-
+                    )}
                 </div>
 
-                {/* Name */}
-                <span className="truncate">{node.name}</span>
+                <div className="flex h-6 w-6 items-center justify-center">
+                    {isFolder ? (
+                        open ? (
+                            <FolderOpen size={17} className="text-foreground" />
+                        ) : (
+                            <Folder size={17} className="text-foreground-muted" />
+                        )
+                    ) : (
+                        getFileIcon(node.name)
+                    )}
+                </div>
 
-            </motion.div>
+                <span className="min-w-0 break-all text-sm text-foreground-muted transition-colors group-hover:text-foreground">
+                    {node.name}
+                </span>
+            </div>
 
-
-            {/* Children */}
             <AnimatePresence initial={false}>
-
                 {open && node.children?.length > 0 && (
-
                     <motion.div
-                        initial="collapsed"
-                        animate="open"
-                        exit="collapsed"
-                        transition={{ duration: 0.25, ease: "easeInOut" }}
-                        variants={{
-                            open: {
-                                height: "auto",
-                                opacity: 1,
-                                transition: {
-                                    staggerChildren: 0.03
-                                }
-                            },
-                            collapsed: {
-                                height: 0,
-                                opacity: 0
-                            }
-                        }}
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.18 }}
                         className="overflow-hidden"
                     >
-
                         {node.children.map((child: any) => (
-                            <TreeNode
-                                key={child.id}
-                                node={child}
-                                depth={depth + 1}
-                            />
+                            <TreeNode key={child.id} node={child} depth={depth + 1} />
                         ))}
-
                     </motion.div>
-
                 )}
-
             </AnimatePresence>
-
         </div>
     )
 }

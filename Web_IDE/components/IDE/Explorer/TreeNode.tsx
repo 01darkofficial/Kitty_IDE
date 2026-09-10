@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronRight, Folder, FolderOpen } from "lucide-react"
+import { ChevronRight, Folder, FolderOpen, FilePlus, FolderPlus, Copy, Scissors, ClipboardPaste, Pencil, Trash2, } from "lucide-react"
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from "@/components/shadcn/ui/context-menu"
 import { motion, AnimatePresence } from "framer-motion"
 import { getFileIcon } from "@/lib/fileSystem/getFileIcon"
@@ -9,6 +9,7 @@ import { CREATING_ID } from "./treeUtils"
 import { useExplorerStore } from "@/store/explorerStore"
 import { ExplorerAction, } from "@/types/components/ide"
 import { TreeNode as TreeNodeModel } from "@/lib/fileSystem/buildTree"
+import { cn } from "@/lib/utils"
 
 interface TreeNodeProps {
     node: TreeNodeModel
@@ -90,18 +91,18 @@ export default function TreeNode({
             <ContextMenu>
                 <ContextMenuTrigger asChild>
                     <motion.div
-                        layout
                         whileHover={{
                             backgroundColor: "rgba(63,63,70,0.6)"
                         }}
                         whileTap={{
-                            scale: 0.98
+                            scale: 0.99
                         }}
-                        className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer transition-colors
-                                ${isSelected ? "bg-zinc-800" : ""}`
-                        }
+                        className={cn(
+                            "group flex items-center gap-2 px-2 py-1.5 rounded-xsm cursor-pointer transition-colors",
+                            isSelected ? "bg-zinc-800 text-white" : "text-zinc-300 hover:bg-zinc-800/70 hover:text-white"
+                        )}
                         style={{
-                            paddingLeft: depth * 12
+                            paddingLeft: depth * 14 + 8
                         }}
                         onClick={() => {
                             onSelect(node)
@@ -110,19 +111,16 @@ export default function TreeNode({
                             }
                         }}
                     >
-                        {/* Chevron */}
                         <motion.div
                             animate={{
                                 rotate: isFolder && isOpen ? 90 : 0
                             }}
                             className="w-4 flex justify-center"
                         >
-                            {isFolder
-                                ? <ChevronRight size={14} />
-                                : <span className="w-3.5" />
+                            {isFolder ? <ChevronRight size={14} /> : <span className="w-3.5" />
                             }
                         </motion.div>
-                        {/* Icon */}
+
                         <div className="w-5 flex items-center justify-center">
                             {isFolder ? isOpen
                                 ? (
@@ -140,76 +138,89 @@ export default function TreeNode({
                                 : getFileIcon(node.name)
                             }
                         </div>
-                        {/* Name */}
-                        <span className="truncate">
+
+                        <span className="min-w-0 flex-1 truncate">
                             {node.name}
                         </span>
                     </motion.div>
                 </ContextMenuTrigger>
 
-                {/* Context Menu */}
-
-                <ContextMenuContent className="w-48">
+                <ContextMenuContent
+                    alignOffset={4}
+                    className="w-56 rounded-sm border border-zinc-800 bg-zinc-900 p-1.5 shadow-2xl animate-fade-in"
+                >
                     {isFolder && (
                         <>
                             <ContextMenuItem
-                                onClick={() =>
-                                    onAction("new-file", node)
-                                }
+                                inset
+                                onClick={() => onAction("new-file", node)}
+                                className="h-8 rounded-xsm px-2 text-zinc-200 focus:bg-zinc-800 focus:text-white"
                             >
+                                <FilePlus className="mr-2 h-4 w-4 text-zinc-400" />
                                 New File
                             </ContextMenuItem>
+
                             <ContextMenuItem
-                                onClick={() =>
-                                    onAction("new-folder", node)
-                                }
+                                inset
+                                onClick={() => onAction("new-folder", node)}
+                                className="h-8 rounded-xsm px-2 text-zinc-200 focus:bg-zinc-800 focus:text-white"
                             >
+                                <FolderPlus className="mr-2 h-4 w-4 text-zinc-400" />
                                 New Folder
                             </ContextMenuItem>
-                            <ContextMenuSeparator />
+
+                            <ContextMenuSeparator className="my-1 bg-zinc-800" />
                         </>
                     )}
+
                     <ContextMenuItem
-                        onClick={() =>
-                            onAction("copy", node)
-                        }
+                        inset
+                        onClick={() => onAction("copy", node)}
+                        className="h-8 rounded-xsm px-2 text-zinc-200 focus:bg-zinc-800 focus:text-white"
                     >
+                        <Copy className="mr-2 h-4 w-4 text-zinc-400" />
                         Copy
                     </ContextMenuItem>
+
                     <ContextMenuItem
-                        onClick={() =>
-                            onAction("cut", node)
-                        }
+                        inset
+                        onClick={() => onAction("cut", node)}
+                        className="h-8 rounded-xsm px-2 text-zinc-200 focus:bg-zinc-800 focus:text-white"
                     >
+                        <Scissors className="mr-2 h-4 w-4 text-zinc-400" />
                         Cut
                     </ContextMenuItem>
+
                     <ContextMenuItem
-                        onClick={() =>
-                            onAction("paste", node)
-                        }
+                        inset
+                        onClick={() => onAction("paste", node)}
+                        className="h-8 rounded-xsm px-2 text-zinc-200 focus:bg-zinc-800 focus:text-white"
                     >
+                        <ClipboardPaste className="mr-2 h-4 w-4 text-zinc-400" />
                         Paste
                     </ContextMenuItem>
-                    <ContextMenuSeparator />
+
+                    <ContextMenuSeparator className="my-1 bg-zinc-800" />
+
                     <ContextMenuItem
-                        onClick={() =>
-                            onAction("rename", node)
-                        }
+                        inset
+                        onClick={() => onAction("rename", node)}
+                        className="h-8 rounded-xsm px-2 text-zinc-200 focus:bg-zinc-800 focus:text-white"
                     >
+                        <Pencil className="mr-2 h-4 w-4 text-zinc-400" />
                         Rename
                     </ContextMenuItem>
+
                     <ContextMenuItem
-                        className="text-red-500"
-                        onClick={() =>
-                            onAction("delete", node)
-                        }
+                        inset
+                        onClick={() => onAction("delete", node)}
+                        className="h-8 rounded-xsm px-2 text-red-400 focus:bg-red-500/10 focus:text-red-400"
                     >
+                        <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                     </ContextMenuItem>
                 </ContextMenuContent>
             </ContextMenu>
-
-            {/* Children */}
 
             <AnimatePresence>
                 {isFolder && isOpen && (
@@ -226,11 +237,10 @@ export default function TreeNode({
                             opacity: 0,
                             height: 0
                         }}
-                        className="ml-4"
+                        className="overflow-hidden"
                     >
                         {(node.children ?? []).map(
-                            (child: any) => (
-
+                            (child: TreeNodeModel) => (
                                 <TreeNode
                                     key={child.id}
                                     node={child}
