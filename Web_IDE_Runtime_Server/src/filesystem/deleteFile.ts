@@ -1,6 +1,24 @@
 import fs from "fs/promises"
-import { resolveSafePath } from "./pathUtils"
+import { buildFileMap, resolveSafePath } from "./pathUtils"
 import { FileNode } from "../types/db"
+
+export async function deleteFilesFromDisk(
+    projectId: string,
+    fileIds: string[],
+    allFiles: FileNode[]
+) {
+    const fileMap = buildFileMap(allFiles)
+    const files = fileIds.map((id) => fileMap.get(id)).filter(Boolean) as FileNode[]
+    const idSet = new Set(fileIds)
+
+    const rootTargets = files.filter((file) => {
+        return !file.parent_id || !idSet.has(file.parent_id)
+    })
+
+    for (const file of rootTargets) {
+        await deleteFileFromDisk(projectId, file, fileMap)
+    }
+}
 
 export async function deleteFileFromDisk(
     projectId: string,

@@ -1,15 +1,8 @@
 import { z } from "zod"
 
 export const updateFileSchema = z.object({
-
-    id: z
-        .string()
-        .uuid("Invalid file id"),
-
-    content: z
-        .string()
-        .max(2_000_000, "File too large")
-
+    fileId: z.uuid({ error: "Invalid file id" }),
+    content: z.string().max(2_000_000, "File too large"),
 })
 
 export type UpdateFileInput = z.infer<typeof updateFileSchema>

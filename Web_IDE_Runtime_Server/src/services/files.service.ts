@@ -2,8 +2,8 @@ import docker from "../runtime/docker"
 import { parseLsOutput } from "../filesystem/parseLsOutput"
 import { createFileOnDisk } from "../filesystem/createFile"
 import { updateFileOnDisk } from "../filesystem/updateFile"
-import { readFileFromDisk } from "../filesystem/readFile"
-import { deleteFileFromDisk } from "../filesystem/deleteFile"
+import { readAllFilesFromDisk, readFileFromDisk } from "../filesystem/readFile"
+import { deleteFileFromDisk, deleteFilesFromDisk } from "../filesystem/deleteFile"
 import { FileNode } from "../types/db"
 
 export async function listFiles(projectId: string) {
@@ -87,7 +87,7 @@ export async function createFileService(
 
 export async function updateFileService(
     projectId: string,
-    file: FileNode,
+    fileId: string,
     allFiles: FileNode[],
     content: string
 ) {
@@ -96,7 +96,7 @@ export async function updateFileService(
             throw new Error("projectId required")
         }
 
-        await updateFileOnDisk(projectId, file, allFiles, content)
+        await updateFileOnDisk(projectId, fileId, allFiles, content)
 
         return {
             success: true
@@ -104,7 +104,7 @@ export async function updateFileService(
     } catch (err) {
         console.error("updateFileService failed:", {
             projectId,
-            fileName: file?.name,
+            fileId,
             error: err
         })
         throw err
@@ -113,11 +113,11 @@ export async function updateFileService(
 
 export async function readFileService(
     projectId: string,
-    file: FileNode,
+    fileId: string,
     allFiles: FileNode[]
 ) {
     try {
-        const content = await readFileFromDisk(projectId, file, allFiles)
+        const content = await readFileFromDisk(projectId, fileId, allFiles)
 
         return {
             content
@@ -125,20 +125,44 @@ export async function readFileService(
     } catch (err) {
         console.error("readFileService failed:", {
             projectId,
-            fileName: file?.name,
+            fileId,
             error: err
         })
         throw err
     }
 }
 
-export async function deleteFileService(
+export async function readAllFilesService(
     projectId: string,
-    file: FileNode,
-    allFiles: Map<string, FileNode>
+    allFiles: FileNode[]
 ) {
     try {
-        await deleteFileFromDisk(projectId, file, allFiles)
+
+        const files = await readAllFilesFromDisk(
+            projectId,
+            allFiles
+        )
+
+        return { files }
+
+    } catch (err) {
+
+        console.error("readAllFilesService failed:", {
+            projectId,
+            error: err,
+        })
+
+        throw err
+    }
+}
+
+export async function deleteFileService(
+    projectId: string,
+    fileIds: string[],
+    allFiles: FileNode[]
+) {
+    try {
+        await deleteFilesFromDisk(projectId, fileIds, allFiles)
 
         return {
             success: true
@@ -147,7 +171,7 @@ export async function deleteFileService(
     } catch (err) {
         console.error("deleteFileService failed:", {
             projectId,
-            fileName: file?.name,
+            fileIds,
             error: err
         })
         throw err

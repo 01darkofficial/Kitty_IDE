@@ -1,5 +1,5 @@
 import { Request, Response } from "express"
-import { createFileService, deleteFileService, listFiles, readFileService, updateFileService } from "../services/files.service"
+import { createFileService, deleteFileService, listFiles, readAllFilesService, readFileService, updateFileService } from "../services/files.service"
 
 export async function getFilesController(req: Request, res: Response) {
     const projectId = req.query.projectId as string
@@ -45,17 +45,15 @@ export async function createFileController(req: Request, res: Response) {
 
 export async function updateFileController(req: Request, res: Response) {
     try {
-        const { projectId, file, allFiles, content } = req.body
+        const { projectId, fileId, allFiles, content } = req.body
 
-        console.log("updating file: ", file, content)
         if (!projectId) {
             return res.status(400).json({
-                error:
-                    "projectId required"
+                error: "projectId required"
             })
         }
 
-        await updateFileService(projectId, file, allFiles, content)
+        await updateFileService(projectId, fileId, allFiles, content)
 
         res.json({
             success: true
@@ -71,9 +69,25 @@ export async function updateFileController(req: Request, res: Response) {
 export async function readFileController(req: Request, res: Response
 ) {
     try {
-        const { projectId, file, allFiles } = req.body
+        const { projectId, fileId, allFiles } = req.body
 
-        const result = await readFileService(projectId, file, allFiles)
+        const result = await readFileService(projectId, fileId, allFiles)
+        res.json(result)
+    } catch (err) {
+        console.error("READ FILE ERROR:", err
+        )
+        res.status(500).json({
+            error: "failed to read file"
+        })
+    }
+}
+
+export async function readAllFilesController(req: Request, res: Response
+) {
+    try {
+        const { projectId, allFiles } = req.body
+
+        const result = await readAllFilesService(projectId, allFiles)
         res.json(result)
     } catch (err) {
         console.error("READ FILE ERROR:", err
@@ -86,45 +100,15 @@ export async function readFileController(req: Request, res: Response
 
 export async function deleteFileController(req: Request, res: Response) {
     try {
-        const { projectId, files, allFiles } = req.body
+        const { projectId, fileIds, allFiles } = req.body
 
-        if (!projectId || !files) {
+        if (!projectId || !fileIds) {
             return res.status(400).json({
                 error: "Invalid payload"
             })
         }
 
-        /*
-        STEP 1 — Build fileMap ONCE
-        */
-
-        const fileMap = new Map<string, any>()
-
-        for (const f of allFiles) {
-            fileMap.set(f.id, f)
-
-        }
-
-        /*
-        STEP 2 — Filter root targets
-        (avoid redundant deletes)
-        */
-
-        const idSet = new Set(files.map((f: any) => f.id))
-
-        const rootTargets = files.filter((file: any) => {
-            if (!file.parent_id) return true
-
-            return !idSet.has(file.parent_id)
-        })
-
-        /*
-        STEP 3 — Delete only root nodes
-        */
-
-        for (const file of rootTargets) {
-            await deleteFileService(projectId, file, fileMap)
-        }
+        await deleteFileService(projectId, fileIds, allFiles)
 
         res.json({
             success: true

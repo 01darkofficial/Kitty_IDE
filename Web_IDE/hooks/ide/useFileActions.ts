@@ -22,7 +22,6 @@ export function useFileActions(project: Project) {
             parent_id: creatingNode.parentId,
             name,
             type: "file",
-            content: "",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         })
@@ -37,7 +36,6 @@ export function useFileActions(project: Project) {
             parent_id: creatingNode.parentId,
             name,
             type: "folder",
-            content: "",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         })
@@ -70,10 +68,10 @@ export function useFileActions(project: Project) {
         }
 
         collect(nodeId)
-        const ids = Array.from(idsToDelete)
+        const fileIds = Array.from(idsToDelete)
 
         try {
-            await deleteNodes(project.id, ids)
+            await deleteNodes(project.id, fileIds)
             setFiles(files.filter(f => !idsToDelete.has(f.id)))
         } catch (err) {
             console.error("Delete failed:", err)

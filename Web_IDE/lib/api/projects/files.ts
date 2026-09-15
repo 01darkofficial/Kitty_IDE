@@ -18,14 +18,28 @@ export async function fetchProjectTree(projectId: string): Promise<TreeNode[]> {
     return tree;
 }
 
-export const saveFile = async (activeFile: FileNode) => {
-    await fetch(`/api/projects/${activeFile.project_id}/updateFile`, {
+export async function saveFile(
+    projectId: string,
+    fileId: string,
+    content: string
+) {
+
+    const res = await fetch(`/api/projects/${projectId}/updateFile`, {
         method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-            id: activeFile.id,
-            content: activeFile.content
-        })
-    });;
+            fileId,
+            content,
+        }),
+    })
+
+    if (!res.ok) {
+        throw new Error("Failed to save file")
+    }
+
+    return res.json()
 }
 
 export const createNode = async (
@@ -50,7 +64,7 @@ export const createNode = async (
 
 export const deleteNodes = async (
     projectId: string,
-    ids: string[]
+    fileIds: string[]
 ) => {
 
     const res = await fetch(`/api/projects/${projectId}/deleteNode`,
@@ -60,7 +74,7 @@ export const deleteNodes = async (
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                ids
+                fileIds
             })
         }
     )

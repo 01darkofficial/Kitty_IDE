@@ -1,5 +1,12 @@
 import { createServerSupabase } from "@/lib/supabase/supabaseServer"
 import { updateFileSchema } from "@/lib/validation/file"
+import { z } from "zod"
+
+const RUNTIME_API_URL = process.env.RUNTIME_SERVER_URL
+
+if (!RUNTIME_API_URL) {
+    throw new Error("Missing RUNTIME_API_URL")
+}
 
 export async function POST(
     req: Request,
@@ -17,25 +24,21 @@ export async function POST(
             )
         }
 
-        /*
-        Parse request
-        */
+        // Parse request
 
         const body = await req.json()
         const parsed = updateFileSchema.safeParse(body)
 
         if (!parsed.success) {
             return Response.json(
-                { error: parsed.error.flatten() },
+                { error: z.flattenError(parsed.error) },
                 { status: 400 }
             )
         }
 
-        const { id, content } = parsed.data
+        const { fileId, content } = parsed.data
 
-        /*
-        Fetch full file tree
-        */
+        // Fetch full file tree
 
         const { data: allFiles, error: treeError } = await supabase.from("files").select("*").eq("project_id", projectId)
 
@@ -46,11 +49,9 @@ export async function POST(
             )
         }
 
-        /*
-        Find file metadata
-        */
+        // Find file metadata
 
-        const file = allFiles.find((f) => f.id === id)
+        const file = allFiles.find((f) => f.id === fileId)
 
         if (!file) {
             return Response.json(
@@ -59,41 +60,34 @@ export async function POST(
             )
         }
 
-        /*
-        Call proxy to update disk
-        */
+        // Call runtime server to update file
 
-        const proxyResponse = await fetch(`${process.env.PROXY_URL}/files/update`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
-                body: JSON.stringify({
-                    projectId,
-                    file,
-                    allFiles,
-                    content
-                })
-            }
-        )
+        const runtimeServerResponse = await fetch(`${RUNTIME_API_URL}/files/update`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                projectId,
+                fileId,
+                allFiles,
+                content
+            })
+        })
 
-        if (!proxyResponse.ok) {
-            console.error("Proxy update failed:", await proxyResponse.text())
+        if (!runtimeServerResponse.ok) {
+            console.error("Proxy update failed:", await runtimeServerResponse.text())
             return Response.json(
                 { error: "Disk update failed" },
                 { status: 500 }
             )
         }
 
-        /*
-        Update only updated_at in DB
-        */
+        // Update only updated_at in DB
 
         const { error: updateError } = await supabase.from("files").update({
             updated_at: new Date().toISOString()
-        }).eq("id", id).eq("project_id", projectId)
+        }).eq("id", fileId).eq("project_id", projectId)
 
         if (updateError) {
             return Response.json(
@@ -102,9 +96,7 @@ export async function POST(
             )
         }
 
-        /*
-        Success
-        */
+        // Success
 
         return Response.json({
             success: true

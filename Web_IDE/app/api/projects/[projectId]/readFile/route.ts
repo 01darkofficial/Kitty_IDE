@@ -1,5 +1,11 @@
 import { createServerSupabase } from "@/lib/supabase/supabaseServer"
 
+const RUNTIME_API_URL = process.env.RUNTIME_SERVER_URL
+
+if (!RUNTIME_API_URL) {
+    throw new Error("Missing RUNTIME_API_URL")
+}
+
 export async function POST(
     req: Request,
     { params }: { params: Promise<{ projectId: string }> }
@@ -17,14 +23,14 @@ export async function POST(
         }
 
         const body = await req.json()
-        const { id } = body
+        const { fileId } = body
 
         /*
         Fetch metadata tree
         */
 
         const { data: allFiles } = await supabase.from("files").select("*").eq("project_id", projectId)
-        const file = allFiles!.find(f => f.id === id)
+        const file = allFiles!.find(f => f.id === fileId)
 
         if (!file) {
             return Response.json(
@@ -33,26 +39,20 @@ export async function POST(
             )
         }
 
-        /*
-        Call proxy
-        */
+        // Reading file from runtime server
+        const runtimeServerResponse = await fetch(`${RUNTIME_API_URL}/files/read`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                projectId,
+                fileId,
+                allFiles
+            })
+        })
 
-        const proxyResponse = await fetch(`${process.env.PROXY_URL}/files/read`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
-                body: JSON.stringify({
-                    projectId,
-                    file,
-                    allFiles
-                })
-            }
-        )
-
-        const data = await proxyResponse.json()
+        const data = await runtimeServerResponse.json()
 
         return Response.json(data)
     } catch (err) {

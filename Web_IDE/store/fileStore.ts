@@ -1,115 +1,188 @@
-import { FileNode } from "@/types/db"
+"use client"
+
 import { create } from "zustand"
-import { explorerLogger } from "@/utils/logger"
+
+import { FileNode } from "@/types/db"
+import { EditorFile } from "@/types/editor"
 
 type FileStore = {
+    /* ---------------- Project Metadata ---------------- */
     files: FileNode[]
-    activeFile: FileNode | null
-    setFiles: (files: | FileNode[] | ((prev: FileNode[]) => FileNode[])) => void
-    setActiveFile: (file: FileNode, projectId: string) => Promise<void>
-    updateFileContent: (id: string, content: string) => void
+    setFiles: (files: FileNode[] | ((prev: FileNode[]) => FileNode[])) => void
+    addFile: (file: FileNode) => void
+    updateFileMeta: (fileId: string, updates: Partial<FileNode>) => void
+    removeFile: (fileId: string) => void
+
+    /* ---------------- Editor Cache ---------------- */
+    editorFiles: Record<string, EditorFile>
+    setEditorFile: (fileId: string, content: string) => void
+    setEditorFiles: (files: Record<string, { id: string, content: string }>) => void
+    removeEditorFile: (fileId: string) => void
+    updateFileContent: (fileId: string, content: string) => void
+    markSaved: (fileId: string) => void
+
+    /* Static Preview Cache */
+    previewLoaded: boolean
+
+    /* ---------------- Editor State ---------------- */
+    openTabs: string[]
+    activeFileId: string | null
+    activeFile: EditorFile | null
+    openTab: (fileId: string) => void
+    closeTab: (fileId: string) => void
+    setActiveFile: (fileId: string | null) => void
+
+    /* ---------------- Utilities ---------------- */
+    reset: () => void
 }
 
-/**
- * File store managing file tree state and
- * file content loading from backend.
- */
-export const useFileStore =
-    create<FileStore>((set, get) => ({
+export const useFileStore = create<FileStore>((set) => ({
 
-        files: [],
-        activeFile: null,
+    /* ---------------- Initial State ---------------- */
+    files: [],
+    editorFiles: {},
+    openTabs: [],
+    activeFileId: null,
+    activeFile: null,
+    previewFiles: {},
+    previewLoaded: false,
 
-        setFiles: (files) => set((state) => ({
-            files: typeof files === "function" ? files(state.files) : files
-        })),
+    /* ---------------- Project Metadata ---------------- */
 
-        /**
-         * Loads file content from backend
-         * if not already cached locally.
-         */
-        setActiveFile:
-            async (file, projectId) => {
+    setFiles: (files) => set((state) => ({
+        files: typeof files === "function" ? files(state.files) : files,
+    })),
 
-                if (!file) {
-                    set({ activeFile: null })
-                    return
-                }
+    addFile: (file) => set((state) => ({ files: [...state.files, file] })),
 
-                const existing = get().files.find(
-                    f => f.id === file.id
-                )
+    updateFileMeta: (fileId, updates) => set((state) => ({
+        files: state.files.map((file) => file.id === fileId ? { ...file, ...updates } : file),
+    })),
 
-                // Use cached content if available
-                if (existing?.content) {
-                    explorerLogger.kittyDebug("Using cached file: ", file.id)
-                    set({ activeFile: existing })
-                    return
-                }
+    removeFile: (fileId) => set((state) => {
+        const nextEditorFiles = { ...state.editorFiles }
+        delete nextEditorFiles[fileId]
+        const nextTabs = state.openTabs.filter((id) => id !== fileId)
+        const nextActiveId = state.activeFileId === fileId ? nextTabs[nextTabs.length - 1] ?? null : state.activeFileId
 
-                explorerLogger.kittyLog("Loading file: ", file.id)
+        return {
+            files: state.files.filter((f) => f.id !== fileId),
+            editorFiles: nextEditorFiles,
+            openTabs: nextTabs,
+            activeFileId: nextActiveId,
+            activeFile: nextActiveId ? nextEditorFiles[nextActiveId] : null,
+        }
+    }),
 
-                // Set placeholder before fetch
-                set({
-                    activeFile: {
-                        ...file,
-                        content: ""
-                    }
-                })
+    /* ---------------- Editor Cache ---------------- */
 
-                try {
+    setEditorFile: (fileId, content) => set((state) => {
+        const editorFile: EditorFile = {
+            content,
+            dirty: false,
+            version: 1,
+            lastLoaded: Date.now(),
+        }
 
-                    const res = await fetch(`/api/projects/${projectId}/readFile`, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            id: file.id
-                        })
-                    })
+        return {
+            editorFiles: { ...state.editorFiles, [fileId]: editorFile },
+            activeFile: state.activeFileId === fileId ? editorFile : state.activeFile,
+        }
+    }),
 
-                    if (!res.ok) {
-                        explorerLogger.kittyError("File read API failed:", res.status)
-                        return
-                    }
+    setEditorFiles: (files) => set((state) => {
+        const nextEditorFiles = { ...state.editorFiles }
 
-                    const data = await res.json()
+        for (const file of Object.values(files)) {
+            nextEditorFiles[file.id] = {
+                content: file.content,
+                dirty: false, version: 1,
+                lastLoaded: Date.now(),
+            }
+        }
 
-                    explorerLogger.kittyDebug("File loaded: ", file.id)
+        return {
+            editorFiles: nextEditorFiles,
+        }
+    }),
 
-                    set((state) => ({
+    removeEditorFile: (fileId) => set((state) => {
+        const nextEditorFiles = { ...state.editorFiles }
+        delete nextEditorFiles[fileId]
 
-                        files: state.files.map((f) => f.id === file.id ? {
-                            ...f,
-                            content: data.content
-                        } : f),
+        return {
+            editorFiles: nextEditorFiles,
+            activeFile: state.activeFileId === fileId ? null : state.activeFile,
+        }
+    }),
 
-                        activeFile: {
-                            ...file,
-                            content: data.content
-                        }
-                    }))
-                }
+    updateFileContent: (fileId, content) => set((state) => {
+        const file = state.editorFiles[fileId]
+        if (!file) return state
 
-                catch (err) {
-                    explorerLogger.kittyError("File load failed: ", file.id, err)
-                }
+        const updatedFile: EditorFile = {
+            ...file,
+            content,
+            dirty: true,
+            version: file.version + 1,
+        }
+
+        return {
+            editorFiles: {
+                ...state.editorFiles,
+                [fileId]: updatedFile,
             },
+        }
+    }),
 
-        /**
-         * Updates file content in local store.
-         */
-        updateFileContent: (id, content) => set((state) => ({
+    markSaved: (fileId) => set((state) => {
+        const file = state.editorFiles[fileId]
 
-            files: state.files.map((file) => file.id === id ? {
-                ...file,
-                content
-            } : file),
+        if (!file) return state
 
-            activeFile: state.activeFile?.id === id ? {
-                ...state.activeFile,
-                content
-            } : state.activeFile
-        }))
-    }))
+        const updatedFile: EditorFile = { ...file, dirty: false, }
+
+        return {
+            editorFiles: {
+                ...state.editorFiles,
+                [fileId]: updatedFile,
+            },
+            activeFile: state.activeFileId === fileId ? updatedFile : state.activeFile,
+        }
+    }),
+
+    /* ---------------- Editor State ---------------- */
+
+    openTab: (fileId) => set((state) => ({
+        openTabs: state.openTabs.includes(fileId) ? state.openTabs : [...state.openTabs, fileId],
+        activeFileId: fileId,
+        activeFile: state.editorFiles[fileId] ?? null,
+    })),
+
+    closeTab: (fileId) => set((state) => {
+        const nextTabs = state.openTabs.filter((id) => id !== fileId)
+
+        const nextActiveId = state.activeFileId === fileId ? nextTabs[nextTabs.length - 1] ?? null : state.activeFileId
+
+        return {
+            openTabs: nextTabs,
+            activeFileId: nextActiveId,
+            activeFile: nextActiveId ? state.editorFiles[nextActiveId] : null,
+        }
+    }),
+
+    setActiveFile: (fileId) => set((state) => ({
+        activeFileId: fileId,
+        activeFile: fileId ? state.editorFiles[fileId] ?? null : null,
+    })),
+
+    /* ---------------- Reset ---------------- */
+
+    reset: () => set({
+        files: [],
+        editorFiles: {},
+        openTabs: [],
+        activeFileId: null,
+        activeFile: null,
+    }),
+}))

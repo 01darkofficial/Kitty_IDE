@@ -1,7 +1,6 @@
 "use client"
 
 import { getLanguage } from "@/lib/editor/getLanguage"
-import { useFileStore } from "@/store/fileStore"
 import dynamic from "next/dynamic"
 
 const Editor = dynamic(
@@ -9,10 +8,16 @@ const Editor = dynamic(
     { ssr: false }
 )
 
-export default function MonacoEditor({ file, onChange }: any) {
+interface MonacoEditorProps {
+    file: {
+        id: string
+        name: string
+        content: string
+    } | null
+    onChange: (content: string) => void
+}
 
-    const updateFileContent = useFileStore((s) => s.updateFileContent)
-    const activeFile = useFileStore((s) => s.activeFile)
+export default function MonacoEditor({ file, onChange }: MonacoEditorProps) {
 
     if (!file) {
         return (
@@ -30,11 +35,8 @@ export default function MonacoEditor({ file, onChange }: any) {
                 height="100%"
                 theme="vs-dark"
                 language={language}
-                value={activeFile?.content || ""}
-                onChange={(value) => {
-                    updateFileContent(activeFile!.id, value ?? "")
-                    onChange(value ?? "")
-                }}
+                value={file.content}
+                onChange={(value) => onChange(value ?? "")}
                 options={{
                     minimap: { enabled: false },
                     fontSize: 14

@@ -17,44 +17,30 @@ export async function POST(
         }
 
         const body = await req.json()
-        const { ids } = body
+        const { fileIds } = body
 
-        if (!ids?.length) {
+        if (!fileIds?.length) {
             return Response.json(
                 { error: "No ids provided" },
                 { status: 400 }
             )
         }
 
-        /*
-        Fetch all files once
-        */
-
+        // Fetch all files once
         const { data: allFiles } = await supabase.from("files").select("*").eq("project_id", projectId)
 
-        /*
-        Filter target files
-        */
-
-        const filesToDelete = allFiles!.filter(f => ids.includes(f.id))
-
-        /*
-        Delete on disk FIRST
-        */
-
-        const runtimeServerResponse = await fetch(`${process.env.RUNTIME_SERVER_URL}/files/delete`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    projectId,
-                    files: filesToDelete,
-                    allFiles
-                })
-            }
-        )
+        // Delete on disk first
+        const runtimeServerResponse = await fetch(`${process.env.RUNTIME_SERVER_URL}/files/delete`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                projectId,
+                fileIds,
+                allFiles
+            })
+        })
 
         if (!runtimeServerResponse.ok) {
             return Response.json(
@@ -63,11 +49,8 @@ export async function POST(
             )
         }
 
-        /*
-        Delete metadata from DB
-        */
-
-        await supabase.from("files").delete().in("id", ids)
+        // Delete metadata from DB
+        await supabase.from("files").delete().in("id", fileIds)
 
         return Response.json({
             success: true

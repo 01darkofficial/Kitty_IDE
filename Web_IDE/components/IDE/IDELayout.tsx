@@ -13,12 +13,13 @@ import { FileNode, Project } from "@/types/db"
 import { useProjectWebSocket } from "@/hooks/ide/useProjectWS"
 import { useFileTabs } from "@/hooks/ide/useFileTabs"
 import { useFileActions } from "@/hooks/ide/useFileActions"
-import { useAutoSave } from "@/hooks/ide/useAutoSave"
+import { useManualSave, useDebouncedSave } from "@/hooks/ide/useFileSave"
 import { useNodeKeepAlive } from "@/hooks/ide/useNodeKeepAlive"
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { useMediaQuery } from "@/hooks/ide/useMediaQuery"
 import ResizeHandle from "./ResizeHandle";
 import { cn } from "@/lib/utils"
+import { updateServerPreviewCache } from "@/lib/apiClient/projects/preview"
 
 interface IDELayoutProps {
     project: Project
@@ -29,8 +30,27 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
 
     const files = useFileStore((s) => s.files)
     const setFiles = useFileStore((s) => s.setFiles)
-    const activeFile = useFileStore((s) => s.activeFile)
-    const setActiveFile = useFileStore((s) => s.setActiveFile)
+
+    const activeFileId = useFileStore((s) => s.activeFileId)
+    const editorFiles = useFileStore((s) => s.editorFiles)
+
+    const updateFileContentInStore = useFileStore((s) => s.updateFileContent)
+
+    const activeFileMeta = activeFileId
+        ? files.find((f) => f.id === activeFileId)
+        : null
+
+    const activeEditorFile = activeFileId
+        ? editorFiles[activeFileId]
+        : null
+
+    const activeFile =
+        activeFileMeta && activeEditorFile
+            ? {
+                ...activeFileMeta,
+                ...activeEditorFile,
+            }
+            : null
     const setSelectedNodeId = useExplorerStore(s => s.setSelectedNode)
     const setActiveContainerId = useExplorerStore(s => s.setActiveContainer)
     const {
@@ -70,7 +90,7 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
 
     useEffect(() => {
         setFiles(initialFiles)
-    }, [initialFiles])
+    }, [initialFiles, setFiles])
 
     useEffect(() => {
         setExplorerOpen(true)
@@ -94,7 +114,8 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
     ])
 
     useProjectWebSocket(project.id)
-    useAutoSave(project.id, project.runtime, iframeRef)
+    useManualSave(project.id)
+    useDebouncedSave(project.id)
     useNodeKeepAlive(project.id, project.runtime)
 
     const { tabs, openFile, closeTab, switchTab } = useFileTabs(project.id)
@@ -105,13 +126,13 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
         setActiveContainerId(null)
     }
 
-    function updateFileContent(content: string) {
-        if (!activeFile) return
-        const updated = files.map((f: any) =>
-            f.id === activeFile.id ? { ...f, content } : f
-        )
-        setFiles(updated)
-        setActiveFile({ ...activeFile, content }, project.id)
+    function handleEditorChange(content: string) {
+        if (!activeFileId) return
+
+        updateFileContentInStore(activeFileId, content)
+        updateServerPreviewCache(project.id, activeFileId, content).then(() => {
+            iframeRef.current?.contentWindow?.location.reload()
+        }).catch(console.error)
     }
 
     function renameFile(fileId: string, newName: string) {
@@ -179,6 +200,10 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
         window.addEventListener("mouseup", onUp)
     }
 
+    function openPreview() {
+        window.open(`/preview/${project.id}/index.html?ts=${Date.now()}`, "_blank")
+    }
+
     const showEditorWorkspace = !isMobile || mobileWorkspace === "editor";
     const showTerminalWorkspace = isMobile && mobileWorkspace === "terminal";
     const showPreviewWorkspace = isMobile && mobileWorkspace === "preview";
@@ -188,7 +213,7 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
             "flex h-dvh flex-col overflow-hidden text-zinc-100",
             isResizing ? "select-none cursor-col-resize" : ""
         )} >
-            <IDEHeader project={project} />
+            <IDEHeader project={project} onOpenPreview={openPreview} />
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
                 <div
@@ -215,38 +240,43 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
                     <ResizeHandle direction="vertical" onMouseDown={startExplorerResize} />
                 )}
 
-                <div className={cn("flex min-w-0 min-h-0 flex-1 flex-col",
+                <div className={cn("flex min-w-0 min-h-0 flex-1",
                     isResizing ? "select-none cursor-col-resize" : "")}>
                     {showEditorWorkspace && (
-                        <>
-                            <EditorTabs
-                                tabs={tabs}
-                                activeFile={activeFile}
-                                onSwitch={switchTab}
-                                onClose={closeTab}
-                            />
+                        <div className={cn(
+                            "flex min-h-0 flex-1",
+                            project.runtime === "node" && "flex-col"
+                        )}>
+                            <div className="flex min-h-0 flex-1 flex-col">
+                                <EditorTabs
+                                    tabs={tabs}
+                                    activeFileId={activeFileId}
+                                    onSwitch={switchTab}
+                                    onClose={closeTab}
+                                />
 
-                            <div className="min-h-0 flex-1 overflow-hidden">
-                                <div className="flex h-full min-h-0 min-w-0 overflow-hidden">
-                                    <MonacoEditor file={activeFile} onChange={updateFileContent} />
-
-                                    {project.runtime === "static" && previewOpen && isDesktop && (
-                                        <ResizeHandle direction="vertical" onMouseDown={startPreviewResize} />
-                                    )}
-
-                                    {project.runtime === "static" && (
-                                        <div
-                                            className={cn(
-                                                "shrink-0 overflow-hidden transition-[width] ease-out",
-                                                isResizing ? "duration-0" : "duration-150"
-                                            )}
-                                            style={{ width: previewOpen ? previewWidth : 0 }}
-                                        >
-                                            <PreviewPanel projectId={project.id} iframeRef={iframeRef} />
-                                        </div>
-                                    )}
+                                <div className="min-h-0 flex-1 overflow-hidden">
+                                    <div className="flex h-full min-h-0 min-w-0 overflow-hidden">
+                                        <MonacoEditor file={activeFile} onChange={handleEditorChange} />
+                                    </div>
                                 </div>
                             </div>
+
+                            {project.runtime === "static" && previewOpen && isDesktop && (
+                                <ResizeHandle direction="vertical" onMouseDown={startPreviewResize} />
+                            )}
+
+                            {project.runtime === "static" && (
+                                <div
+                                    className={cn(
+                                        "shrink-0 overflow-hidden transition-[width] ease-out",
+                                        isResizing ? "duration-0" : "duration-150"
+                                    )}
+                                    style={{ width: previewOpen ? previewWidth : 0 }}
+                                >
+                                    <PreviewPanel projectId={project.id} iframeRef={iframeRef} />
+                                </div>
+                            )}
 
                             {project.runtime === "node" && terminalOpen && isDesktop && (
                                 <ResizeHandle direction="horizontal" onMouseDown={startTerminalResize} />
@@ -263,7 +293,7 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
                                     <TerminalPanel projectId={project.id} />
                                 </div>
                             )}
-                        </>
+                        </div>
                     )}
 
                     {showTerminalWorkspace && project.runtime === "node" && (
