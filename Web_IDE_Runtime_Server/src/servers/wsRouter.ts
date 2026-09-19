@@ -1,6 +1,7 @@
 import { IncomingMessage } from "http"
 import { terminalWss } from "./wsTerminal"
 import { projectWss } from "./wsProject"
+import { lspWss } from "./wsLsp"
 import { runtimeMap } from "../runtime/runtimeMap"
 import { proxy } from "./previewProxy"
 import { lastUsedMap } from "../runtime/activity"
@@ -52,6 +53,13 @@ export function handleUpgrade(
     if (url.startsWith("/project")) {
         upgradeLogger.kittyDebug("Project WS upgrade: ", url)
         upgradeWS(projectWss, req, socket, head)
+        return true
+    }
+
+    // LSP WebSocket (/lsp/*)
+    if (url.startsWith("/lsp")) {
+        upgradeLogger.kittyDebug("LSP WS upgrade:", url)
+        upgradeWS(lspWss, req, socket, head)
         return true
     }
 

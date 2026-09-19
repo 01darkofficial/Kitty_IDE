@@ -115,7 +115,7 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
 
     useProjectWebSocket(project.id)
     useManualSave(project.id)
-    useDebouncedSave(project.id)
+    // useDebouncedSave(project.id)
     useNodeKeepAlive(project.id, project.runtime)
 
     const { tabs, openFile, closeTab, switchTab } = useFileTabs(project.id)

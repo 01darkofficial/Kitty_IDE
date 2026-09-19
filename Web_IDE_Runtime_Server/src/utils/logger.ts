@@ -20,3 +20,5 @@ export const httpServerLogger = createKittyLogger("kitty-runtime-http");
 export const containerRuntimeLogger = createKittyLogger("kitty-runtime-container");
 export const runtimePortLogger = createKittyLogger("kitty-runtime-port");
 export const projectLogger = createKittyLogger("kitty-runtime-project");
+export const lspLogger = createKittyLogger("kitty-runtime-lsp");
+export const wsLspLogger = createKittyLogger("kitty-runtime-wsLsp");
