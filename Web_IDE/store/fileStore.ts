@@ -27,7 +27,6 @@ type FileStore = {
     /* ---------------- Editor State ---------------- */
     openTabs: string[]
     activeFileId: string | null
-    activeFile: EditorFile | null
     openTab: (fileId: string) => void
     closeTab: (fileId: string) => void
     setActiveFile: (fileId: string | null) => void
@@ -43,7 +42,6 @@ export const useFileStore = create<FileStore>((set) => ({
     editorFiles: {},
     openTabs: [],
     activeFileId: null,
-    activeFile: null,
     previewFiles: {},
     previewLoaded: false,
 
@@ -70,7 +68,6 @@ export const useFileStore = create<FileStore>((set) => ({
             editorFiles: nextEditorFiles,
             openTabs: nextTabs,
             activeFileId: nextActiveId,
-            activeFile: nextActiveId ? nextEditorFiles[nextActiveId] : null,
         }
     }),
 
@@ -86,7 +83,6 @@ export const useFileStore = create<FileStore>((set) => ({
 
         return {
             editorFiles: { ...state.editorFiles, [fileId]: editorFile },
-            activeFile: state.activeFileId === fileId ? editorFile : state.activeFile,
         }
     }),
 
@@ -112,7 +108,6 @@ export const useFileStore = create<FileStore>((set) => ({
 
         return {
             editorFiles: nextEditorFiles,
-            activeFile: state.activeFileId === fileId ? null : state.activeFile,
         }
     }),
 
@@ -147,7 +142,6 @@ export const useFileStore = create<FileStore>((set) => ({
                 ...state.editorFiles,
                 [fileId]: updatedFile,
             },
-            activeFile: state.activeFileId === fileId ? updatedFile : state.activeFile,
         }
     }),
 
@@ -156,7 +150,6 @@ export const useFileStore = create<FileStore>((set) => ({
     openTab: (fileId) => set((state) => ({
         openTabs: state.openTabs.includes(fileId) ? state.openTabs : [...state.openTabs, fileId],
         activeFileId: fileId,
-        activeFile: state.editorFiles[fileId] ?? null,
     })),
 
     closeTab: (fileId) => set((state) => {
@@ -167,13 +160,11 @@ export const useFileStore = create<FileStore>((set) => ({
         return {
             openTabs: nextTabs,
             activeFileId: nextActiveId,
-            activeFile: nextActiveId ? state.editorFiles[nextActiveId] : null,
         }
     }),
 
     setActiveFile: (fileId) => set((state) => ({
         activeFileId: fileId,
-        activeFile: fileId ? state.editorFiles[fileId] ?? null : null,
     })),
 
     /* ---------------- Reset ---------------- */
@@ -183,6 +174,5 @@ export const useFileStore = create<FileStore>((set) => ({
         editorFiles: {},
         openTabs: [],
         activeFileId: null,
-        activeFile: null,
     }),
 }))

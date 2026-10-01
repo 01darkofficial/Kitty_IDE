@@ -1,6 +1,6 @@
 import path from "path"
 
-import { LspSession } from "../types/lsp"
+import { LspSession, OpenDocument } from "../types/lsp"
 
 const ROOT = process.env.MAINROOT ?? "/var/lib/cloud-ide/projects"
 
@@ -15,7 +15,7 @@ export function createSession(
         projectId,
         workspacePath: path.join(ROOT, projectId),
         process: null,
-        stdoutBuffer: "",
+        stdoutBuffer: Buffer.alloc(0),
         documents: new Map(),
         uriToFileId: new Map(),
         fileIdToUri: new Map(),
@@ -46,4 +46,22 @@ export function unregisterUri(
 
     session.fileIdToUri.delete(fileId)
     session.uriToFileId.delete(uri)
+}
+
+export function openDocument(
+    session: LspSession,
+    document: OpenDocument,
+) {
+    session.documents.set(document.fileId, document)
+    registerUri(session, document.fileId, document.uri)
+    touchSession(session)
+}
+
+export function closeDocument(
+    session: LspSession,
+    fileId: string,
+) {
+    session.documents.delete(fileId)
+    unregisterUri(session, fileId)
+    touchSession(session)
 }

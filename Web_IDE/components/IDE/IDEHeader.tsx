@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { PanelLeft, SquareTerminal, MonitorPlay, ExternalLink } from "lucide-react"
 import WorkspaceButton from "./WorkspaceButton"
 import { useWorkspaceStore } from "@/store/workspaceStore"
@@ -61,12 +60,11 @@ export default function IDEHeader({ project, onOpenPreview }: IDEHeaderProps) {
         <header className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 lg:px-6">
             <div className="flex w-1/3 items-center gap-2">
                 <Link href={"/app"} target="_blank" rel="noopener noreferrer">
-                    <Image src="/logo.jpg" alt="Kitty IDE"
+                    <img src="/logo.jpg" alt="Kitty IDE"
                         width={34}
-                        height={34}
-                        className="rounded"
+                        height={19.5}
+                        className="rounded-xsm"
                     />
-
                 </Link>
                 <h3 className="text-md font-bold">Kitty IDE</h3>
             </div>

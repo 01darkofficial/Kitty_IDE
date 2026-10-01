@@ -7,7 +7,14 @@ import { useFileStore } from "@/store/fileStore"
 
 import { FileNode } from "@/types/db"
 import { saveFile } from "@/lib/api/projects/files"
+import { sendDidClose, sendDidOpen } from "@/lib/lsp/client"
+import { buildFileUri } from "@/lib/lsp/buildFileUri"
+import { getLspLanguage } from "@/lib/editor/getLanguage"
+import { editorLogger } from "@/utils/logger"
 
+/**
+ * Manages editor tabs and synchronizes their document lifecycle with the LSP.
+ */
 export function useFileTabs(projectId: string) {
 
     /* ---------------- File Store ---------------- */
@@ -63,13 +70,21 @@ export function useFileTabs(projectId: string) {
         }
 
         setActiveContainer(file.parent_id)
+        const wasAlreadyOpen = openTabs.includes(file.id)
 
         // Open tab immediately.
         openTab(file.id)
 
+        const uri = buildFileUri(projectId, file.id, files)
+        const lspLanguage = getLspLanguage(file.name)
+
         // Use cached content if available.
         if (editorFiles[file.id]) {
             setActiveFile(file.id)
+            if (!wasAlreadyOpen && lspLanguage) {
+                const uri = buildFileUri(projectId, file.id, files)
+                sendDidOpen(uri, lspLanguage, editorFiles[file.id].content)
+            }
             return
         }
 
@@ -89,6 +104,9 @@ export function useFileTabs(projectId: string) {
         const { content } = await res.json()
 
         setEditorFile(file.id, content)
+        if (lspLanguage) {
+            sendDidOpen(uri, lspLanguage, content)
+        }
         setActiveFile(file.id)
     }
 
@@ -102,6 +120,7 @@ export function useFileTabs(projectId: string) {
         const editorFile = editorFiles[fileId]
 
         closeTabInStore(fileId)
+        sendDidClose(buildFileUri(projectId, fileId, files))
 
         // Save before closing if there are unsaved changes.
         if (editorFile?.dirty) {
@@ -109,7 +128,7 @@ export function useFileTabs(projectId: string) {
                 await saveFile(projectId, fileId, editorFile.content)
                 markSaved(fileId)
             } catch (err) {
-                console.error("Failed to save before closing:", err)
+                editorLogger.kittyError("Failed to save before closing:", err)
                 // Later can show a toast if save failed.
             }
         }

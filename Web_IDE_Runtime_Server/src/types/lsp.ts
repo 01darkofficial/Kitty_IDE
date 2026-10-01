@@ -15,7 +15,7 @@ export interface LspSession {
     projectId: string
     workspacePath: string
     process: ChildProcessWithoutNullStreams | null
-    stdoutBuffer: string
+    stdoutBuffer: Buffer
     documents: Map<string, OpenDocument>
     uriToFileId: Map<string, string>
     fileIdToUri: Map<string, string>

@@ -20,13 +20,17 @@ import { useMediaQuery } from "@/hooks/ide/useMediaQuery"
 import ResizeHandle from "./ResizeHandle";
 import { cn } from "@/lib/utils"
 import { updateServerPreviewCache } from "@/lib/apiClient/projects/preview"
+import { sendDidChange } from "@/lib/lsp/client"
+import { buildFileUri } from "@/lib/lsp/buildFileUri"
+import { useLsp } from "@/hooks/lsp/uselsp"
 
 interface IDELayoutProps {
+    userId: string
     project: Project
     files: FileNode[]
 }
 
-export default function IDELayout({ project, files: initialFiles }: IDELayoutProps) {
+export default function IDELayout({ userId, project, files: initialFiles }: IDELayoutProps) {
 
     const files = useFileStore((s) => s.files)
     const setFiles = useFileStore((s) => s.setFiles)
@@ -36,21 +40,14 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
 
     const updateFileContentInStore = useFileStore((s) => s.updateFileContent)
 
-    const activeFileMeta = activeFileId
-        ? files.find((f) => f.id === activeFileId)
-        : null
+    const activeFileMeta = activeFileId ? files.find((f) => f.id === activeFileId) : null
+    const activeEditorFile = activeFileId ? editorFiles[activeFileId] : null
 
-    const activeEditorFile = activeFileId
-        ? editorFiles[activeFileId]
-        : null
-
-    const activeFile =
-        activeFileMeta && activeEditorFile
-            ? {
-                ...activeFileMeta,
-                ...activeEditorFile,
-            }
-            : null
+    const activeFile = activeFileMeta && activeEditorFile ? {
+        id: activeFileMeta.id,
+        name: activeFileMeta.name,
+        content: activeEditorFile.content,
+    } : null
     const setSelectedNodeId = useExplorerStore(s => s.setSelectedNode)
     const setActiveContainerId = useExplorerStore(s => s.setActiveContainer)
     const {
@@ -85,8 +82,9 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
 
     const isMobile = useMediaQuery("(max-width: 767px), (pointer: coarse) and (max-height: 500px)")
     const isDesktop = useMediaQuery("(min-width: 1024px)")
-
     const isResizing = useWorkspaceStore((s) => s.isResizing)
+
+    useLsp(project.id, userId)
 
     useEffect(() => {
         setFiles(initialFiles)
@@ -126,13 +124,38 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
         setActiveContainerId(null)
     }
 
+    const lspChangeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const previewTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
     function handleEditorChange(content: string) {
         if (!activeFileId) return
 
         updateFileContentInStore(activeFileId, content)
-        updateServerPreviewCache(project.id, activeFileId, content).then(() => {
-            iframeRef.current?.contentWindow?.location.reload()
-        }).catch(console.error)
+
+        const { editorFiles } = useFileStore.getState()
+        const version = editorFiles[activeFileId].version
+
+        const uri = buildFileUri(project.id, activeFileId, files)
+
+        // Debounce LSP updates.
+        if (lspChangeTimeout.current) {
+            clearTimeout(lspChangeTimeout.current)
+        }
+
+        lspChangeTimeout.current = setTimeout(() => {
+            sendDidChange(uri, version, content)
+        }, 200)
+
+        // Debounce preview updates.
+        if (previewTimeout.current) {
+            clearTimeout(previewTimeout.current)
+        }
+
+        previewTimeout.current = setTimeout(() => {
+            updateServerPreviewCache(project.id, activeFileId, content).then(() => {
+                iframeRef.current?.contentWindow?.location.reload()
+            }).catch(console.error)
+        }, 300)
     }
 
     function renameFile(fileId: string, newName: string) {
@@ -257,7 +280,7 @@ export default function IDELayout({ project, files: initialFiles }: IDELayoutPro
 
                                 <div className="min-h-0 flex-1 overflow-hidden">
                                     <div className="flex h-full min-h-0 min-w-0 overflow-hidden">
-                                        <MonacoEditor file={activeFile} onChange={handleEditorChange} />
+                                        <MonacoEditor projectId={project.id} runtime={project.runtime} file={activeFile} onChange={handleEditorChange} />
                                     </div>
                                 </div>
                             </div>

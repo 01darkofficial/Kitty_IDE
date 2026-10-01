@@ -91,14 +91,11 @@ export default function TreeNode({
             <ContextMenu>
                 <ContextMenuTrigger asChild>
                     <motion.div
-                        whileHover={{
-                            backgroundColor: "rgba(63,63,70,0.6)"
-                        }}
                         whileTap={{
                             scale: 0.99
                         }}
                         className={cn(
-                            "group flex items-center gap-2 px-2 py-1.5 rounded-xsm cursor-pointer transition-colors",
+                            "group flex items-center gap-2 px-2 py-1.5 cursor-pointer transition-colors duration-75",
                             isSelected ? "bg-zinc-800 text-white" : "text-zinc-300 hover:bg-zinc-800/70 hover:text-white"
                         )}
                         style={{

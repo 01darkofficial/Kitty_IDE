@@ -32,3 +32,29 @@ export function getLanguage(filename: string): string {
             return "plaintext"
     }
 }
+
+/**
+ * Returns the language identifier used by the TypeScript language server.
+ */
+export function getLspLanguage(filename: string): string | null {
+    const ext = filename.split(".").pop()?.toLowerCase()
+
+    switch (ext) {
+        case "js":
+        case "mjs":
+        case "cjs":
+            return "javascript"
+
+        case "jsx":
+            return "javascriptreact"
+
+        case "ts":
+            return "typescript"
+
+        case "tsx":
+            return "typescriptreact"
+
+        default:
+            return null
+    }
+}
