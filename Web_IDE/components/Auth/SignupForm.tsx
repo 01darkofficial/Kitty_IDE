@@ -22,6 +22,7 @@ export default function SignupForm() {
     const [remember, setRemember] = useState(false)
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
+    const [confirmationSent, setConfirmationSent] = useState(false)
 
     async function handleSignup() {
 
@@ -47,7 +48,12 @@ export default function SignupForm() {
         const { error } = await supabase.auth.signUp({
             email,
             password,
-            options: { data: { username } }
+            options: {
+                data: {
+                    username,
+                },
+                emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
         })
 
         setLoading(false)
@@ -57,8 +63,44 @@ export default function SignupForm() {
             return
         }
 
-        router.push("/app")
-        router.refresh()
+        setConfirmationSent(true)
+    }
+
+    if (confirmationSent) {
+        return (
+            <div className="bg-surface flex h-full min-h-0 flex-col overflow-y-auto no-scrollbar">
+                <div className="my-auto flex flex-col p-6 sm:p-8 lg:p-12">
+                    <div className="mb-8 space-y-2">
+                        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
+                            Check your email
+                        </h1>
+
+                        <p className="text-sm sm:text-base text-foreground-muted">
+                            We've sent a confirmation link to{" "}
+                            <span className="font-medium text-foreground">
+                                {email}
+                            </span>
+                            .
+                        </p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <p className="text-sm text-foreground-muted">
+                            Click the link in the email to verify your account
+                            and continue to Kitty IDE.
+                        </p>
+
+                        <Button
+                            variant="outline"
+                            onClick={() => setConfirmationSent(false)}
+                            className="h-10 sm:h-11 w-full rounded-xsm border-outline bg-canvas text-foreground hover:bg-surface-hover transition-normal"
+                        >
+                            Back to sign up
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     return (

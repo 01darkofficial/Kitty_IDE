@@ -1,4 +1,5 @@
 import { Button } from "@/components/shadcn/ui/button";
+import { supabase } from "@/lib/supabase/supabaseClient"
 
 interface OAuthButtonsProps {
     loading?: boolean
@@ -7,11 +8,26 @@ interface OAuthButtonsProps {
 export default function OAuthButtons({
     loading = false
 }: OAuthButtonsProps) {
+
+    async function handleOAuth(provider: "google" | "github") {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider,
+            options: {
+                redirectTo: `${window.location.origin}/auth/callback`,
+            },
+        })
+
+        if (error) {
+            console.error("OAuth login failed:", error)
+        }
+    }
+
     return (
         <div className="space-y-3">
             <Button
                 variant="outline"
                 disabled={loading}
+                onClick={() => handleOAuth("google")}
                 className="h-10 sm:h-11 w-full justify-center gap-3 rounded-xsm border-outline bg-canvas text-foreground hover:bg-surface-hover hover:border-neutral-border disabled:opacity-50 disabled:cursor-not-allowed transition-normal">
                 <GoogleIcon />
 
@@ -23,7 +39,8 @@ export default function OAuthButtons({
             <Button
                 variant="outline"
                 disabled={loading}
-                className="h-10 sm:h-11 w-full justify-center gap-3 rounded-xsm border-outlinebg-canvas text-foregroundhover:bg-surface-hover hover:border-neutral-border disabled:opacity-50 disabled:cursor-not-allowed transition-normal">
+                onClick={() => handleOAuth("github")}
+                className="h-10 sm:h-11 w-full justify-center gap-3 rounded-xsm border-outline bg-canvas text-foreground hover:bg-surface-hover hover:border-neutral-border disabled:opacity-50 disabled:cursor-not-allowed transition-normal">
                 <GithubIcon />
 
                 <span className="text-sm sm:text-base">
