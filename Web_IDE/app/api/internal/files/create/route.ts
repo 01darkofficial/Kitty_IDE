@@ -1,6 +1,6 @@
-import { supabaseAdmin }
-    from "@/lib/supabase/admin"
+import { supabaseAdmin } from "@/lib/supabase/admin"
 import { FileNode } from "@/types/db"
+import { backendApiLogger } from "@/utils/logger"
 
 export async function POST(
     req: Request
@@ -8,18 +8,11 @@ export async function POST(
 
     try {
 
-        const body =
-            await req.json()
-
-        const {
-            projectId,
-            entries
-        } = body
-
+        const body = await req.json()
+        const { projectId, entries } = body
         const createdNodes: FileNode[] = []
 
-
-        console.log("frontend recieved entries: ", entries)
+        backendApiLogger.kittyDebug("frontend recieved entries: ", entries)
 
         if (!projectId) {
 
@@ -32,10 +25,7 @@ export async function POST(
 
         if (!Array.isArray(entries)) {
 
-            console.error(
-                "Invalid entries payload:",
-                entries
-            )
+            backendApiLogger.kittyError("Invalid entries payload: ", entries)
 
             return Response.json(
                 { error: "Invalid entries" },
@@ -44,20 +34,13 @@ export async function POST(
 
         }
 
-        const supabase =
-            supabaseAdmin
-
+        const supabase = supabaseAdmin
 
         entries.sort((a, b) => {
-
-            const depthA =
-                a.relative.split("/").length
-
-            const depthB =
-                b.relative.split("/").length
+            const depthA = a.relative.split("/").length
+            const depthB = b.relative.split("/").length
 
             return depthA - depthB
-
         })
 
         /*
@@ -66,176 +49,100 @@ export async function POST(
 
         for (const entry of entries) {
 
-            const relative =
-                entry.relative
+            const relative = entry.relative
+            const type = entry.type
 
-            const type =
-                entry.type
-
-            if (!relative || !type)
+            if (!relative || !type) {
                 continue
+            }
 
-            const parts =
-                relative.split("/")
+            const parts = relative.split("/")
+            const name = parts.pop()
 
-            const name =
-                parts.pop()
-
-            if (!name)
+            if (!name) {
                 continue
+            }
 
-            let parentId:
-                string | null = null
+            let parentId: string | null = null
 
-            /*
-            Resolve parent chain
-            */
+            // Resolve parent chain
 
             for (const folder of parts) {
 
-                let query =
-                    supabase
-                        .from("files")
-                        .select("id")
-                        .eq("project_id", projectId)
-                        .eq("name", folder)
+                let query = supabase.from("files").select("id").eq("project_id", projectId).eq("name", folder)
 
-                /*
-                CRITICAL FIX:
-                Handle null parent correctly
-                */
-
+                // Handle null parent correctly
                 if (parentId === null) {
-
-                    query =
-                        query.is(
-                            "parent_id",
-                            null
-                        )
-
+                    query = query.is("parent_id", null)
                 } else {
-
-                    query =
-                        query.eq(
-                            "parent_id",
-                            parentId
-                        )
-
+                    query = query.eq("parent_id", parentId)
                 }
 
-                const {
-                    data: existing,
-                    error: findError
-                } =
-                    await query
-                        .maybeSingle()
+                const { data: existing, error: findError } = await query.maybeSingle()
 
                 if (findError) {
-
-                    console.error(
-                        "Parent lookup failed:",
-                        folder,
-                        findError
-                    )
-
-                    continue
-
+                    backendApiLogger.kittyError("Parent lookup failed:", folder, findError)
+                    throw new Error(`Failed to resolve parent folder: ${folder}`)
                 }
 
-                /*
-                Parent exists
-                */
+                // Parent exists
 
                 if (existing) {
-
-                    parentId =
-                        existing.id
-
+                    parentId = existing.id
                     continue
-
                 }
 
-                /*
-                Create missing parent
-                */
+                // Create missing parent
 
-                const {
-                    data: created,
-                    error: createError
-                } =
-                    await supabase
-                        .from("files")
-                        .upsert(
-                            {
-                                name: folder,
-                                type: "folder",
-                                project_id: projectId,
-                                parent_id: parentId
-                            },
-                            {
-                                onConflict:
-                                    "project_id,parent_id,name"
-                            }
-                        )
-                        .select("id")
-                        .single()
-
-                if (
-                    createError ||
-                    !created
-                ) {
-
-                    console.error(
-                        "Parent creation failed:",
-                        folder,
-                        createError
-                    )
-
-                    continue
-
-                }
-
-                parentId =
-                    created.id
-
-            }
-            /*
-            Create final node
-            */
-
-            const {
-                data: created,
-                error: finalError
-            } =
-                await supabase
+                const { data: created, error: createError } = await supabase
                     .from("files")
                     .upsert(
                         {
-                            name,
-                            type,
+                            name: folder,
+                            type: "folder",
                             project_id: projectId,
                             parent_id: parentId
                         },
                         {
-                            onConflict:
-                                "project_id,parent_id,name"
+                            onConflict: "project_id,parent_id,name"
                         }
                     )
-                    .select("*")   // ← IMPORTANT
+                    .select("id")
                     .single()
 
-            createdNodes.push(created)
+                if (createError || !created) {
+                    backendApiLogger.kittyError("Parent creation failed: ", folder, createError)
+                    continue
+                }
 
-            if (finalError) {
-
-                console.error(
-                    "Final insert failed:",
-                    name,
-                    finalError
-                )
+                parentId = created.id
 
             }
 
+            // Create final node
+
+            const { data: created, error: finalError } = await supabase
+                .from("files")
+                .upsert(
+                    {
+                        name,
+                        type,
+                        project_id: projectId,
+                        parent_id: parentId
+                    },
+                    {
+                        onConflict: "project_id,parent_id,name"
+                    }
+                )
+                .select("*")   // ← IMPORTANT
+                .single()
+
+            if (finalError || !created) {
+                backendApiLogger.kittyError("Final insert failed:", name, finalError)
+                throw new Error(`Failed to create entry: ${relative}`)
+            }
+
+            createdNodes.push(created)
         }
 
         return Response.json({
@@ -246,17 +153,11 @@ export async function POST(
     }
 
     catch (err) {
-
-        console.error(
-            "Internal create failed:",
-            err
-        )
-
+        backendApiLogger.kittyError("Internal create failed: ", err)
         return Response.json(
             { error: "Internal error" },
             { status: 500 }
         )
-
     }
 
 }
