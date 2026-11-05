@@ -1,7 +1,8 @@
 export type Profile = {
     id: string
     username: string
-    // role: string
     avatar_url: string | null
-    // created_at: string
+    bio: string
+    website: string
+    visibility: "public" | "private"
 }

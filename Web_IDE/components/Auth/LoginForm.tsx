@@ -24,13 +24,22 @@ export default function LoginForm() {
         setLoading(true)
         setError("")
 
-        const { error } = await supabase.auth.signInWithPassword({ email, password, })
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password, })
 
         setLoading(false)
 
         if (error) {
             setError(error.message)
             return
+        }
+
+        // Backfill accounts created before password sign-in was recorded in
+        // user metadata. This is only used to present the connected method in
+        // settings; the successful password sign-in is the source of truth.
+        if (data.user.user_metadata?.has_password_login !== true) {
+            await supabase.auth.updateUser({
+                data: { has_password_login: true },
+            }).catch(() => undefined)
         }
 
         router.push("/app")

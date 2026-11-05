@@ -51,6 +51,10 @@ export default function SignupForm() {
             options: {
                 data: {
                     username,
+                    // Keep the account settings UI in sync with the credential
+                    // used to create this account. Supabase identities can be
+                    // absent for an unconfirmed signup.
+                    has_password_login: true,
                 },
                 emailRedirectTo: `${window.location.origin}/auth/callback`,
             },
