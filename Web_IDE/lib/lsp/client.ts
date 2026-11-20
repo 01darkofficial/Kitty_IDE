@@ -6,6 +6,7 @@ let requestId = 1
 
 const pending = new Map<number, (value: any) => void>()
 const diagnosticListeners = new Set<(params: PublishDiagnosticsParams) => void>()
+const latestDiagnostics = new Map<string, PublishDiagnosticsParams>()
 
 /**
  * Establishes the WebSocket connection to the LSP server.
@@ -52,7 +53,8 @@ export function connectLsp(
 
         switch (message.method) {
             case "textDocument/publishDiagnostics":
-                // Forward diagnostics to Monaco.
+                // Keep the latest state so panels mounted later can display it too.
+                latestDiagnostics.set(message.params.uri, message.params)
                 diagnosticListeners.forEach((listener) => listener(message.params))
                 break
 
@@ -69,6 +71,7 @@ export function connectLsp(
     socket.onclose = () => {
         socket = null
         pending.clear()
+        latestDiagnostics.clear()
     }
 
     return new Promise((resolve, reject) => {
@@ -84,6 +87,7 @@ export function onDiagnostics(
     listener: (params: PublishDiagnosticsParams) => void
 ) {
     diagnosticListeners.add(listener)
+    latestDiagnostics.forEach((params) => listener(params))
     return () => {
         diagnosticListeners.delete(listener)
     }
